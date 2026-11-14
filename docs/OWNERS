@@ -59,6 +59,7 @@ HUMAN scripts/status.py
 HUMAN scripts/next_cards.py
 HUMAN scripts/card_prompt.py
 HUMAN scripts/merge_lanes.py
+HUMAN scripts/lane.py
 HUMAN scripts/make_worktrees.ps1
 HUMAN scripts/setup.sh
 HUMAN scripts/setup.ps1

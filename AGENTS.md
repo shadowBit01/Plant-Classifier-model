@@ -8,8 +8,9 @@ Frozen encoders (BioCLIP 2 + DINOv3) -> kNN / probe / text-trait scorers -> fusi
 
 ## 0. Who does what
 
-All agents run as T3 Code threads on one machine (Lenovo LOQ, RTX 3050 6 GB). Each lane always works in its own
-fixed folder `PCM-LX` (a git worktree on `lane/LX-...`, also a T3 project). The dispatcher works in the main checkout.
+All agents run as T3 Code threads in ONE T3 project (the main checkout) on one machine (Lenovo LOQ, RTX 3050 6 GB).
+The project root stays on `main` and belongs to the dispatcher. Each lane works in its own folder `.lanes/LX` inside
+the project (a git worktree on local branch `lanework/LX`, pushed to `lane/LX-...`), created by `scripts/lane.py`.
 
 | T3 provider | Lanes |
 |---|---|
@@ -28,14 +29,16 @@ fixed folder `PCM-LX` (a git worktree on `lane/LX-...`, also a T3 project). The 
 Lane details, owned files and task cards: `docs/TASKS.md`. Ownership rules: `docs/OWNERS`.
 
 ## 1. First thing in every new thread
-1. Find your lane in the card prompt (e.g. "lane L3"). Write it to `.lane` in the repo root (gitignored; the
-   ownership hook reads it): bash `echo L3 > .lane`, PowerShell `Set-Content .lane L3 -Encoding ascii`. If `.codegraph/` is missing here and `codegraph` is installed,
-   run `codegraph init` (seconds).
-2. Read, in this order: this file, `vanalens/contracts.py`, `vanalens/config.py`, your own `worklog/<LANE>.md`.
-   Run `python scripts/status.py` to see what other lanes have finished or need. Do not read other lanes' code
-   or worklogs beyond that board.
-3. Append a STARTED entry to `worklog/<LANE>.md` (template in section 6), then commit and push it immediately:
-   the dispatcher only sees committed entries and would otherwise start a duplicate thread for your card.
+1. Find your lane and card in the card prompt (e.g. "Lane L3, card L3-a"). From the project root run
+   `& $env:VANALENS_PY scripts/lane.py L3 --start L3-a` (bash: `"$VANALENS_PY" scripts/lane.py L3 --start L3-a`).
+   It creates or refreshes `.lanes/L3` (merges your lane branch and main into it), writes `.lanes/L3/.lane`, and
+   commits + pushes your STARTED entry so the dispatcher sees the card is in progress.
+2. From then on work ONLY inside `.lanes/<LANE>`: `cd` into it for every command, read and edit only paths under it,
+   commit and push from it. Never edit, commit or run git commands in the project root: it is the dispatcher's
+   checkout on `main`, and its pre-commit hook refuses lane files anyway.
+3. Read, in this order (inside your lane folder): this file, `vanalens/contracts.py`, `vanalens/config.py`, your own
+   `worklog/<LANE>.md`. Run `python scripts/status.py` to see what other lanes have finished or need. Do not read
+   other lanes' code or worklogs beyond that board.
 
 ## 2. Stay in your lane
 - Edit ONLY files your lane owns (`docs/OWNERS`). A pre-commit hook rejects anything else.
@@ -46,19 +49,20 @@ Lane details, owned files and task cards: `docs/TASKS.md`. Ownership rules: `doc
 - Never weaken a test to make it pass.
 
 ## 3. Git
-- Work only on your lane branch (`lane/<LANE>-...`, or the worktree branch T3 Code created for you).
-- Commit messages start with your lane: `[L3] fit temperature on cal split`.
-- Your branch on GitHub is `lane/<LANE>-...` (see `docs/TASKS.md`). Whatever your local branch is called (T3 Code
-  may name worktree branches itself), push with `git push origin HEAD:lane/<LANE>-...`.
-- At card start: `git pull --no-rebase --no-edit origin lane/<LANE>-...` then
-  `git pull --no-rebase --no-edit origin main` (files are disjoint, so this merge is clean).
+- Work only in `.lanes/<LANE>` (local branch `lanework/<LANE>`). Your branch on GitHub is `lane/<LANE>-...`
+  (see `docs/TASKS.md`); push with `git push origin HEAD:lane/<LANE>-...`.
+- Commit messages start with your lane: `[L3] fit temperature on cal split`. Commit and push after each meaningful
+  step, not only at the end: a thread that dies loses only uncommitted work, and the next thread resumes from GitHub.
+- `scripts/lane.py` merges your lane branch and main into your folder at card start (files are disjoint, so this
+  merge is clean). To refresh mid-card: `git pull --no-rebase --no-edit origin main` inside your folder.
 - Never rebase, amend or squash commits you have pushed: the push would be rejected and force-push is blocked.
   If a push is rejected, `git pull --no-rebase --no-edit origin <your branch>` and push again.
 - Never commit to or push `main`; only the dispatcher (`scripts/merge_lanes.py`, main checkout) or the human
   merges. Merges are logged in `worklog/MERGE.md`; a failed merge comes back to your lane as a fix card.
 
 ## 4. Spend tokens carefully
-- Navigate code with `codegraph_explore` before grep/Read. Never Read a whole large file to find one function.
+- CodeGraph indexes the project root, not your lane folder: use `codegraph_explore` only to find where something
+  is, then open the same relative path under `.lanes/<LANE>`. Never Read a whole large file to find one function.
 - Never print datasets, embeddings, model outputs or full logs. Use `head -n 20`, `tail -n 30`, `wc -l`,
   or a one-line `python -c` summary (shapes, counts, means).
 - One task card per thread. When the card is done, write the DONE entry and stop; the dispatcher opens a new thread.
@@ -80,7 +84,8 @@ Lane details, owned files and task cards: `docs/TASKS.md`. Ownership rules: `doc
 - Never enter plan mode or wait for approval: nobody is there to approve.
 
 ## 6. Worklog (mandatory)
-`worklog/<LANE>.md` is append-only and owned by that lane alone. Add an entry when a card starts, when it ends,
+`worklog/<LANE>.md` is append-only and owned by that lane alone. Add an entry when a card starts (`scripts/lane.py
+--start` writes that one for you), when it ends,
 and when you get blocked. Keep each entry at most 8 lines. Append with your file-editing tool, never with shell
 redirection (`>>` / `echo` in PowerShell 5.1 writes UTF-16). Exact format (the status board parses it):
 

@@ -37,11 +37,12 @@ edits it, and every change gets a line in the decisions log at the end.
 - Repo: GitHub `Plant-Classifier-model`. Scaffold = frozen `vanalens/contracts.py`, stubs with exact docstrings,
   tests, `docs/TASKS.md` task cards, `docs/PLAN.json` (cards, deps, lanes, providers), `docs/OWNERS` + pre-commit
   hook, `worklog/<LANE>.md`, `scripts/status.py` board.
-- Autopilot: a Claude dispatcher (`docs/DISPATCHER.md`) runs every 30 min in the main checkout (T3 project
-  `PCM-main`). `scripts/next_cards.py` decides what can start; `scripts/merge_lanes.py` merges finished lanes
+- Autopilot: a Claude dispatcher (`docs/DISPATCHER.md`) runs every 30 min in the main checkout (the single T3
+  project `Plant-Classifier-model`, Local mode). `scripts/next_cards.py` decides what can start; `scripts/merge_lanes.py` merges finished lanes
   behind ownership + gate tests; `scripts/card_prompt.py` prints the exact prompt; threads start through T3's MCP.
-- Each lane works in a fixed folder `..\PCM-LX` (git worktree on `lane/LX-...`, T3 project `PCM-LX`). Lanes merge
-  main in (`git pull --no-rebase`), never rebase.
+- One T3 project only. Each lane works in `.lanes/LX` inside it (git worktree made by `scripts/lane.py`, local
+  branch `lanework/LX`, pushed to `lane/LX-...`). Lanes merge main in, never rebase. The root stays on main and its
+  pre-commit hook accepts only human-owned files there.
 - T3 providers: Claude (dispatcher, L3 core-ml, L6 integration, L7 pitch), Antigravity A (L1 data-eval, L2 encoders,
   only lane on the GPU), Antigravity B (L4 context, L5 app). At most 2 threads per provider. Claude threads share
   one plan limit. Lanes are tied to files, not accounts: the dispatcher can move a lane to another provider.
@@ -57,7 +58,7 @@ edits it, and every change gets a line in the decisions log at the end.
 ## Plan and gates
 | Hours | Work | Gate |
 |---|---|---|
-| 0-1 | Setup, worktrees, T3 projects, schedule | tooling tests green, smoke test dispatches 5 cards |
+| 0-1 | Setup, one T3 project, schedule | tooling tests green, smoke test dispatches 5 cards |
 | 1-6 | Wave 1: L1-a, L2-a, L3-a, L4-a, L5-a; then L1-b (inat_india), L2-b, L2-c, L1-c | lane tests green, embeddings, baseline JSONs |
 | 6-9 | L3-b, L4-b, L6-a | **MVP: real pipeline answers an inat_india test photo** |
 | 9-16 | L6-b final table, L5-b Space | `runs/L6/final.json` |
@@ -84,3 +85,5 @@ Never cut: baseline table, conformal sets, evidence panel, inat_india test split
   inat_india replaces manual downloads as the primary dataset.
 - 03:40 Final audit: merges go through scripts/merge_lanes.py (lane gate tests, abort on red, failures routed
   as fix cards); lanes merge main instead of rebasing; B4 added to L4-b; L6-b no longer merges.
+- 04:10 Single T3 project: lanes work in .lanes/LX worktrees created by scripts/lane.py (which also logs STARTED);
+  PCM-L* projects and make_worktrees.ps1 retired; commits on main limited to human-owned files.

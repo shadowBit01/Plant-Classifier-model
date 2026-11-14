@@ -33,12 +33,14 @@ def extract(tasks: str, card: str) -> str | None:
 def fix_prompt(lane: str, request: str) -> str:
     branch = json.loads((REPO / "docs" / "PLAN.json").read_text(encoding="utf-8"))["lanes"][lane]["branch"]
     card = f"{lane}-fix{datetime.now():%d%H%M}"   # unique per fix round
-    return (f"You are lane {lane}. First write `{lane}` to `.lane` (AGENTS.md section 1), use the venv Python "
-            f"`$VANALENS_PY`, `git pull --no-rebase --no-edit origin {branch}` and `git pull --no-rebase --no-edit origin main`, then add a "
-            f"STARTED entry for {card} to worklog/{lane}.md and commit + push it right away "
-            f"(`git push origin HEAD:{branch}`).\nFix request from the lead: {request}\n"
+    return (f"Lane {lane}, card {card} (a fix). Setup, from the project root: "
+            f"`& $env:VANALENS_PY scripts/lane.py {lane} --start {card}` "
+            f"(bash: `\"$VANALENS_PY\" scripts/lane.py {lane} --start {card}`). It prepares `.lanes/{lane}` and commits + "
+            f"pushes your STARTED entry. Work ONLY inside `.lanes/{lane}` (AGENTS.md section 1).\n"
+            f"Fix request from the lead: {request}\n"
             f"Change only files your lane owns, keep your lane's tests green.\n"
-            f"When done: DONE entry for {card}, commit with prefix [{lane}], `git push origin HEAD:{branch}`, stop.")
+            f"When done, inside `.lanes/{lane}`: DONE entry for {card} in worklog/{lane}.md, commit with prefix [{lane}], "
+            f"`git push origin HEAD:{branch}`, stop.")
 
 
 def main() -> int:

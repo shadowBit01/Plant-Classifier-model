@@ -1,7 +1,7 @@
 # Manual mode (only if autopilot is not running)
 
 Use this when you want to drive the cards yourself, or when the dispatcher can't start threads.
-Setup is the same as `docs/AUTOPILOT.md` steps 1 to 7 (repo, worktrees, T3 projects, permissions, deny lists).
+Setup is the same as `docs/AUTOPILOT.md` steps 1 to 7 (repo, one T3 project, permissions, deny lists).
 
 ## Providers (T3 Settings > Providers)
 - Display names must be exactly `Claude`, `Antigravity A`, `Antigravity B` (PLAN.json uses them).
@@ -12,11 +12,12 @@ Setup is the same as `docs/AUTOPILOT.md` steps 1 to 7 (repo, worktrees, T3 proje
 
 ## Running a card by hand (PowerShell, main checkout)
 ```powershell
-& $env:VANALENS_PY scripts\next_cards.py --fetch        # what can start now, with project + provider
+& $env:VANALENS_PY scripts\next_cards.py --fetch        # what can start now, with its provider
 & $env:VANALENS_PY scripts\card_prompt.py L3-a          # exact prompt for that card
 ```
-Open a new thread in the project it names (`PCM-L3`), on the provider it names, and paste the prompt.
-One card per thread; one thread per lane at a time; at most 2 threads per provider.
+Open a new thread in the project (Local mode) on the provider it names, and paste the prompt. The prompt's first
+step (`scripts/lane.py`) creates the lane's own folder `.lanes/LX`. One card per thread; one thread per lane at a
+time; at most 2 threads per provider.
 
 ## Merging finished cards (main checkout, clean tree)
 ```powershell

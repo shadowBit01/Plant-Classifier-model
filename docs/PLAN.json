@@ -5,8 +5,8 @@
   "L1": {
    "provider": "Antigravity A",
    "branch": "lane/L1-data-eval",
-   "project": "PCM-L1",
-   "folder": "PCM-L1",
+   "project": "Plant-Classifier-model",
+   "folder": ".lanes/L1",
    "tests": [
     "tests/test_eval.py"
    ]
@@ -14,8 +14,8 @@
   "L2": {
    "provider": "Antigravity A",
    "branch": "lane/L2-encoders",
-   "project": "PCM-L2",
-   "folder": "PCM-L2",
+   "project": "Plant-Classifier-model",
+   "folder": ".lanes/L2",
    "tests": [
     "tests/test_encoders.py"
    ]
@@ -23,8 +23,8 @@
   "L3": {
    "provider": "Claude",
    "branch": "lane/L3-core-ml",
-   "project": "PCM-L3",
-   "folder": "PCM-L3",
+   "project": "Plant-Classifier-model",
+   "folder": ".lanes/L3",
    "tests": [
     "tests/test_core.py"
    ]
@@ -32,8 +32,8 @@
   "L4": {
    "provider": "Antigravity B",
    "branch": "lane/L4-context",
-   "project": "PCM-L4",
-   "folder": "PCM-L4",
+   "project": "Plant-Classifier-model",
+   "folder": ".lanes/L4",
    "tests": [
     "tests/test_context.py"
    ]
@@ -41,8 +41,8 @@
   "L5": {
    "provider": "Antigravity B",
    "branch": "lane/L5-app",
-   "project": "PCM-L5",
-   "folder": "PCM-L5",
+   "project": "Plant-Classifier-model",
+   "folder": ".lanes/L5",
    "tests": [
     "tests/test_app.py"
    ]
@@ -50,8 +50,8 @@
   "L6": {
    "provider": "Claude",
    "branch": "lane/L6-integration",
-   "project": "PCM-L6",
-   "folder": "PCM-L6",
+   "project": "Plant-Classifier-model",
+   "folder": ".lanes/L6",
    "tests": [
     "tests/test_pipeline.py"
    ]
@@ -59,8 +59,8 @@
   "L7": {
    "provider": "Claude",
    "branch": "lane/L7-pitch",
-   "project": "PCM-L7",
-   "folder": "PCM-L7",
+   "project": "Plant-Classifier-model",
+   "folder": ".lanes/L7",
    "tests": []
   }
  },
@@ -163,5 +163,6 @@
     "L6-b"
    ]
   }
- ]
+ ],
+ "project": "Plant-Classifier-model"
 }

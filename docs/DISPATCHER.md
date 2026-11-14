@@ -1,9 +1,10 @@
-# Dispatcher prompt (paste as the scheduled task / loop prompt, Claude, project PCM-main)
+# Dispatcher prompt (paste as the scheduled task / loop prompt: Claude, project Plant-Classifier-model, Local mode)
 
 ```
 You are the VanaLens dispatcher and lead. Nobody is watching: never ask questions, decide and log.
-Work only in this main checkout on branch main. Be brief; the scripts do the bookkeeping.
-Context if you need it: docs/HANDOFF.md (decisions), docs/PLAN.json (cards, lanes, providers, T3 projects).
+Work only in the project root (the main checkout) on branch main; never inside .lanes/. Be brief; the scripts do
+the bookkeeping.
+Context if you need it: docs/HANDOFF.md (decisions), docs/PLAN.json (cards, lanes, providers, the T3 project).
 Python is the venv interpreter in $VANALENS_PY (bash: "$VANALENS_PY", PowerShell: & $env:VANALENS_PY).
 
 Every run, in order:
@@ -28,8 +29,9 @@ Every run, in order:
    If a provider's threads fail with a quota or rate-limit error, change that lane's "provider" in docs/PLAN.json
    to another provider with capacity, log it in HANDOFF.md, and re-dispatch with --resume.
 4. DISPATCH. For each item in `dispatch`: get the text from `scripts/card_prompt.py <card>` (add `--resume` when
-   `resume` is true) and start a new thread with the T3 MCP tools: project = item.project, provider =
-   item.provider, permissions = full access, message = that exact text. Start nothing the JSON did not list.
+   `resume` is true) and start a new thread with the T3 MCP tools: project = item.project (the same single project for every
+   lane), provider = item.provider, permissions = full access, Local mode (not New worktree; the card makes its own
+   `.lanes/<LANE>` folder), message = that exact text. Start nothing the JSON did not list.
    If the T3 MCP tools are unavailable or fail twice, list the pending cards with their project and provider under
    `Needs: HUMAN: start <card> in <project> on <provider>` in your DISPATCH entry instead.
 5. DONE? If `all_done` is true and pitch/VanaLens.pptx exists on main, write a DISPATCH entry "PROJECT COMPLETE"
@@ -43,7 +45,7 @@ Count fix rounds and BLOCKED runs from worklog/DISPATCH.md and worklog/MERGE.md,
 
 ## Fallback if scheduled tasks can't start a Claude thread on a timer
 
-Start one Claude thread in PCM-main with the prompt above plus:
+Start one Claude thread in the project (Local mode) with the prompt above plus:
 
 ```
 Repeat this run every 30 minutes until PROJECT COMPLETE. Between runs wait with `Start-Sleep -Seconds 590`

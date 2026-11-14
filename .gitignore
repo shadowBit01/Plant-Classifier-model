@@ -14,3 +14,6 @@ data/
 wandb/
 .gradio/
 .lane
+.lanes/
+.t3/
+.t3-worktrees/

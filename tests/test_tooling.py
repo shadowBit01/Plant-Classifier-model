@@ -31,10 +31,23 @@ def test_lane_permissions():
     assert co.owner_of("vanalens/contracts.py", OWNERS) == "HUMAN"
 
 
+def _repo_files() -> list[str]:
+    """Tracked + untracked-but-not-ignored files (so .lanes/, .venv/ etc. are skipped); plain walk without git."""
+    import subprocess
+    try:
+        r = subprocess.run(["git", "ls-files", "--cached", "--others", "--exclude-standard"], cwd=REPO,
+                           capture_output=True, text=True, encoding="utf-8", errors="replace")
+        if r.returncode == 0 and r.stdout.strip():
+            return [f for f in r.stdout.splitlines() if (REPO / f).is_file()]
+    except OSError:
+        pass
+    skip_dirs = {".git", ".venv", "__pycache__", ".pytest_cache", ".codegraph", ".lanes", ".t3", ".t3-worktrees"}
+    return [p.relative_to(REPO).as_posix() for p in REPO.rglob("*")
+            if p.is_file() and not (set(p.relative_to(REPO).parts) & skip_dirs) and p.name != ".lane"]
+
+
 def test_every_repo_file_has_exactly_one_owner():
-    skip_dirs = {".git", ".venv", "__pycache__", ".pytest_cache", ".codegraph"}
-    files = [p.relative_to(REPO).as_posix() for p in REPO.rglob("*")
-             if p.is_file() and not (set(p.relative_to(REPO).parts) & skip_dirs) and p.name != ".lane"]
+    files = _repo_files()
     unowned, multi = [], []
     for f in files:
         hits = {lane for lane, pats in OWNERS.items() if any(co.match(f, p) for p in pats)}
@@ -47,6 +60,11 @@ def test_every_repo_file_has_exactly_one_owner():
             multi.append((f, sorted(hits)))
     assert not unowned, f"add these to docs/OWNERS: {unowned}"
     assert not multi, f"owned by more than one lane: {multi}"
+
+
+def test_main_only_takes_human_files():
+    assert co.violations(["docs/HANDOFF.md", "worklog/DISPATCH.md", "docs/PLAN.json"], "HUMAN", OWNERS) == []
+    assert co.violations(["vanalens/scorers.py"], "HUMAN", OWNERS) == [("vanalens/scorers.py", "L3")]
 
 
 def test_violations_report_owner():
@@ -136,15 +154,18 @@ def test_every_plan_card_has_a_prompt():
             assert f"start {c['id']}" in text, f"{c['id']} must commit its STARTED entry immediately"
 
 
-def test_card_prompts_merge_never_rebase():
+def test_card_prompts_use_lane_folders():
     tasks = (REPO / "docs" / "TASKS.md").read_text(encoding="utf-8")
     assert "pull --rebase" not in tasks
     for c in PLAN["cards"]:
-        assert "--no-rebase" in cp.extract(tasks, c["id"])
+        lane = c["id"].split("-")[0]
+        text = cp.extract(tasks, c["id"])
+        assert f"scripts/lane.py {lane} --start {c['id']}" in text and f".lanes/{lane}" in text
+        assert PLAN["lanes"][lane]["project"] == PLAN["project"]          # one T3 project for everything
     fix = cp.fix_prompt("L2", "encode_text must return float32")
-    assert "--no-rebase" in fix and "lane/L2-encoders" in fix and "float32" in fix
+    assert "scripts/lane.py L2 --start L2-fix" in fix and "lane/L2-encoders" in fix and "float32" in fix
     import re
-    assert re.fullmatch(r"L2-fix\d{6}", fix.split("STARTED entry for ")[1].split()[0])   # unique per round
+    assert re.search(r"--start L2-fix\d{6}`", fix)                                   # unique per round
 
 
 def test_fix_card_keeps_lane_busy():

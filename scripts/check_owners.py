@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Reject changes outside the current lane's files (stdlib only).
 
-Lane: --lane, else $VANALENS_LANE, else ./.lane, else branch name lane/<LANE>-*. No lane -> skip (human on main).
+Lane: --lane, else $VANALENS_LANE, else ./.lane, else branch name lane/<LANE>-*.
+A plain commit on branch main (the project root) is checked as HUMAN: only human-owned files; merges pass.
 Modes:
   (default)          check staged files (used by .githooks/pre-commit)
   --range A...B      check files changed between refs (merge gate for L6), e.g. --lane L2 --range main...lane/L2-encoders
@@ -111,12 +112,21 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--files", nargs="*")
     a = ap.parse_args(argv)
 
-    lane = resolve_lane(a.lane)
+    plain_commit = a.lane is None and a.files is None and not a.range
+    if plain_commit and git("rev-parse", "--abbrev-ref", "HEAD") == "main":
+        # the project root stays on main: only the human/dispatcher commits here, and only human-owned files.
+        # Lane work happens in .lanes/<LANE> (scripts/lane.py). Merges are checked by scripts/merge_lanes.py.
+        if git("rev-parse", "-q", "--verify", "MERGE_HEAD"):
+            print("check_owners: merge commit on main; checked by merge_lanes.py")
+            return 0
+        lane = "HUMAN"
+    else:
+        lane = resolve_lane(a.lane)
     if lane is None:
         print("check_owners: no lane set (.lane / VANALENS_LANE / lane/* branch); skipping")
         return 0
     lane = lane.upper()
-    if lane not in LANES:
+    if lane not in LANES + ("HUMAN",):
         print(f"check_owners: unknown lane {lane!r}; expected one of {', '.join(LANES)}")
         return 1
 
@@ -139,7 +149,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"check_owners: lane {lane} may not change:")
         for p, o in bad:
             print(f"  {p}  (owned by {o})")
-        print("Unstage them (git restore --staged <file>) and ask under 'Needs:' in your worklog.")
+        if lane == "HUMAN":
+            print("main only takes human-owned files. Lane work belongs in .lanes/<LANE> (scripts/lane.py).\n"
+                  "Human applying a scaffold update: git commit --no-verify")
+        else:
+            print("Unstage them (git restore --staged <file>) and ask under 'Needs:' in your worklog.")
         return 1
     print(f"check_owners: {len(paths)} file(s) OK for lane {lane}")
     return 0

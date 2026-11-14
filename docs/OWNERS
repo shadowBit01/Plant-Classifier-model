@@ -1,0 +1,57 @@
+# File ownership. One "<LANE> <pattern>" per line.
+# pattern: exact path, a directory ending in "/", or a prefix ending in "*".
+# Every lane also owns worklog/<LANE>.md, runs/<LANE>/ and tests/test_<lane lowercase>_* automatically.
+# HUMAN-owned files may only be changed on main by the human (or L6 when the human asks).
+
+L1 vanalens/data.py
+L1 eval/
+L1 scripts/make_manifests.py
+L1 scripts/baseline_plantnet_api.py
+L1 tests/test_eval.py
+
+L2 vanalens/encoders.py
+L2 scripts/baseline_bioclip.py
+L2 scripts/baseline_plantnet300k.py
+L2 scripts/extract_all.sh
+L2 notebooks/
+L2 tests/test_encoders.py
+
+L3 vanalens/scorers.py
+L3 vanalens/fusion.py
+L3 vanalens/conformal.py
+L3 vanalens/hierarchy.py
+L3 scripts/fit_core.py
+L3 tests/test_core.py
+
+L4 vanalens/geo.py
+L4 vanalens/traits.py
+L4 vanalens/rerank.py
+L4 scripts/build_traits.py
+L4 tests/test_context.py
+
+L5 app/
+L5 space/
+L5 tests/test_app.py
+
+L6 vanalens/pipeline.py
+L6 tests/test_pipeline.py
+L6 requirements.txt
+L6 README.md
+
+HUMAN AGENTS.md
+HUMAN CLAUDE.md
+HUMAN docs/
+HUMAN worklog/MERGE.md
+HUMAN vanalens/contracts.py
+HUMAN vanalens/config.py
+HUMAN vanalens/__init__.py
+HUMAN tests/conftest.py
+HUMAN tests/test_tooling.py
+HUMAN scripts/check_owners.py
+HUMAN scripts/status.py
+HUMAN scripts/setup.sh
+HUMAN scripts/setup.ps1
+HUMAN .gitattributes
+HUMAN .githooks/
+HUMAN .gitignore
+HUMAN pytest.ini

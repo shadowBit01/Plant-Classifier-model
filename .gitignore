@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.codegraph/
+.env
+*.npz
+*.npy
+*.pt
+*.pth
+runs/logs/*
+!runs/logs/.gitkeep
+data/
+wandb/
+.gradio/
+.lane

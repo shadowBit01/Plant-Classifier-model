@@ -1,0 +1,11 @@
+#!/bin/sh
+# Blocks commits that touch files outside this lane (see docs/OWNERS).
+root="$(git rev-parse --show-toplevel)"
+for py in "$VANALENS_PY" python3 python py; do
+  [ -n "$py" ] || continue
+  if "$py" -c "import sys" >/dev/null 2>&1; then
+    exec "$py" "$root/scripts/check_owners.py"
+  fi
+done
+echo "pre-commit: no working Python found (set VANALENS_PY); allowing commit without ownership check" >&2
+exit 0

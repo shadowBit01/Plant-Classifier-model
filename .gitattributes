@@ -1,0 +1,5 @@
+# Keep shell scripts and hooks LF on Windows checkouts (CRLF breaks /bin/sh)
+*.sh text eol=lf
+.githooks/* text eol=lf
+*.py text eol=lf
+*.md text eol=lf

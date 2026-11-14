@@ -1,0 +1,17 @@
+# Install torch/torchvision first with the command for your CUDA from https://pytorch.org/get-started/locally/
+numpy
+scikit-learn
+pillow
+tqdm
+pandas
+requests
+faiss-cpu
+open_clip_torch
+pybioclip
+transformers>=4.56
+timm
+huggingface_hub
+gradio
+anthropic
+wandb
+pytest

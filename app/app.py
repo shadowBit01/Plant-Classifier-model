@@ -16,14 +16,11 @@ Never call models directly: only vanalens.pipeline.get_pipeline().
 """
 from __future__ import annotations
 
-import os
-import tempfile
-from pathlib import Path
-
 import gradio as gr
 
+from vanalens.config import ALPHA
+from vanalens.contracts import ORGANS, Taxon
 from vanalens.pipeline import get_pipeline
-from vanalens.contracts import Taxon
 
 # Try to import read_exif_gps; it may be NotImplementedError at runtime (dev stub).
 try:
@@ -48,13 +45,14 @@ def _try_exif_gps(path: str) -> tuple[float, float] | None:
 
 def _chips_html(pred_set: list[int], taxa_map: dict[int, str]) -> str:
     """Render the conformal prediction set as inline HTML chips."""
+    cov_pct = int(round((1 - ALPHA) * 100))
     chips = "".join(
         f'<span style="display:inline-block;background:#e8f5e9;border:1px solid #81c784;'
         f'border-radius:16px;padding:2px 10px;margin:2px 3px;font-size:0.85em">'
         f'{taxa_map.get(i, f"class {i}")}</span>'
         for i in pred_set
     )
-    return f'<div style="margin-top:6px"><em style="color:#555">90% sure it\'s one of these:</em><br>{chips}</div>'
+    return f'<div style="margin-top:6px"><em style="color:#555">{cov_pct}% sure it\'s one of these:</em><br>{chips}</div>'
 
 
 def _result_html(pred, pipeline) -> str:
@@ -177,13 +175,13 @@ def predict_fn(images, lat_str: str, lon_str: str):
 
     result_html = _result_html(pred, pipeline)
 
-    # Hint: one non-flower photo + multiple species in pred_set
+    # Hint: one photo, multiple species in pred_set, and detected organ is not "flower"
+    # (ORGANS = ("leaf", "flower", "fruit", "bark", "whole_plant", "other"))
     hint_html = ""
     if len(paths) == 1 and len(pred.pred_set) > 1:
         organ = getattr(pred, "organ", None)
-        if organ and organ != "flower":
-            hint_html = _hint_html()
-        elif organ is None:
+        # Suggest flower photo unless the organ already IS a flower (or is unknown)
+        if organ is None or (organ in ORGANS and organ != "flower"):
             hint_html = _hint_html()
 
     return result_html, hint_html

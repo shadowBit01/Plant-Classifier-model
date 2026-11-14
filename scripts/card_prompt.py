@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from datetime import datetime
 import re
 import sys
 from pathlib import Path
@@ -30,12 +31,14 @@ def extract(tasks: str, card: str) -> str | None:
 
 
 def fix_prompt(lane: str, request: str) -> str:
-    branch = json.loads((REPO / "docs" / "PLAN.json").read_text())["lanes"][lane]["branch"]
+    branch = json.loads((REPO / "docs" / "PLAN.json").read_text(encoding="utf-8"))["lanes"][lane]["branch"]
+    card = f"{lane}-fix{datetime.now():%d%H%M}"   # unique per fix round
     return (f"You are lane {lane}. First write `{lane}` to `.lane` (AGENTS.md section 1), use the venv Python "
-            f"`$VANALENS_PY`, `git pull --rebase origin {branch}` and `git pull --rebase origin main`, then add a "
-            f"STARTED entry for {lane}-fix to worklog/{lane}.md.\nFix request from the lead: {request}\n"
+            f"`$VANALENS_PY`, `git pull --no-rebase --no-edit origin {branch}` and `git pull --no-rebase --no-edit origin main`, then add a "
+            f"STARTED entry for {card} to worklog/{lane}.md and commit + push it right away "
+            f"(`git push origin HEAD:{branch}`).\nFix request from the lead: {request}\n"
             f"Change only files your lane owns, keep your lane's tests green.\n"
-            f"When done: DONE entry for {lane}-fix, commit with prefix [{lane}], `git push origin HEAD:{branch}`, stop.")
+            f"When done: DONE entry for {card}, commit with prefix [{lane}], `git push origin HEAD:{branch}`, stop.")
 
 
 def main() -> int:

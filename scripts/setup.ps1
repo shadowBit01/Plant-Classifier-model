@@ -6,7 +6,7 @@ $repo = (Get-Location).Path
 $data  = if ($env:VANALENS_DATA)  { $env:VANALENS_DATA }  else { Join-Path $HOME "vanalens-data" }
 $cache = if ($env:VANALENS_CACHE) { $env:VANALENS_CACHE } else { Join-Path $HOME "vanalens-cache" }
 New-Item -ItemType Directory -Force -Path $data | Out-Null
-foreach ($d in "manifests", "emb", "state", "text", "gbif", "plantnet_api") {
+foreach ($d in "manifests", "emb", "state", "text", "gbif", "plantnet_api", "vlm") {
     New-Item -ItemType Directory -Force -Path (Join-Path $cache $d) | Out-Null
 }
 New-Item -ItemType Directory -Force -Path (Join-Path $repo "runs\logs") | Out-Null
@@ -43,4 +43,4 @@ setx VANALENS_LLM_MODEL "claude-sonnet-5-5" | Out-Null
 
 & $py -m pytest -q --co | Select-Object -Last 1
 Write-Host ">> Done. VANALENS_PY=$py"
-Write-Host ">> Next: git push origin --all ; set PLANTNET_API_KEY (and optionally VANALENS_LLM_KEY) with setx ; quit and reopen T3."
+Write-Host ">> Next: optional keys with setx (PLANTNET_API_KEY, VANALENS_LLM_KEY), then close this window, fully quit and reopen T3 (variables only reach new processes), and continue with docs\AUTOPILOT.md."

@@ -12,7 +12,7 @@ L1 tests/test_eval.py
 L2 vanalens/encoders.py
 L2 scripts/baseline_bioclip.py
 L2 scripts/baseline_plantnet300k.py
-L2 scripts/extract_all.sh
+L2 scripts/extract_all.py
 L2 notebooks/
 L2 tests/test_encoders.py
 
@@ -27,6 +27,7 @@ L4 vanalens/geo.py
 L4 vanalens/traits.py
 L4 vanalens/rerank.py
 L4 scripts/build_traits.py
+L4 scripts/baseline_vlm.py
 L4 tests/test_context.py
 
 L5 app/
@@ -35,6 +36,7 @@ L5 tests/test_app.py
 
 L6 vanalens/pipeline.py
 L6 tests/test_pipeline.py
+L6 scripts/final_table.py
 L6 requirements.txt
 L6 README.md
 
@@ -56,6 +58,7 @@ HUMAN scripts/check_owners.py
 HUMAN scripts/status.py
 HUMAN scripts/next_cards.py
 HUMAN scripts/card_prompt.py
+HUMAN scripts/merge_lanes.py
 HUMAN scripts/make_worktrees.ps1
 HUMAN scripts/setup.sh
 HUMAN scripts/setup.ps1

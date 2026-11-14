@@ -23,7 +23,7 @@ RANK = {"STARTED": 0, "BLOCKED": 1, "DONE": 2}
 
 
 def load_plan(path: Path = REPO / "docs" / "PLAN.json") -> dict:
-    return json.loads(Path(path).read_text())
+    return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
 def group(texts: list[str]) -> dict[str, list[dict]]:
@@ -61,9 +61,21 @@ def compute(plan: dict, main_entries: dict, all_entries: dict, now: datetime) ->
             age = (now - datetime.strptime(e["time"], "%Y-%m-%d %H:%M")).total_seconds() / 60
             (in_flight if age <= stale else stale_cards).append(cid)
 
-    busy_lanes = {cid.split("-")[0] for cid in in_flight + [b["card"] for b in blocked]}
+    plan_ids = {c["id"] for c in plan["cards"]}
+    extra = []   # e.g. "L2-fix" threads started by the dispatcher
+    for cid, es in all_entries.items():
+        lane = cid.split("-")[0]
+        if cid in plan_ids or lane not in lanes:
+            continue
+        e = latest(es)
+        if e["status"] == "STARTED":
+            age = (now - datetime.strptime(e["time"], "%Y-%m-%d %H:%M")).total_seconds() / 60
+            if age <= stale:
+                extra.append(cid)
+
+    busy_lanes = {cid.split("-")[0] for cid in in_flight + extra + [b["card"] for b in blocked]}
     load: dict[str, int] = {}
-    for cid in in_flight:
+    for cid in in_flight + extra:
         p = lanes[cid.split("-")[0]]["provider"]
         load[p] = load.get(p, 0) + 1
 
@@ -81,11 +93,13 @@ def compute(plan: dict, main_entries: dict, all_entries: dict, now: datetime) ->
         busy_lanes.add(lane)
         load[info["provider"]] = load.get(info["provider"], 0) + 1
 
-    needs_merge = sorted({c.split("-")[0] for c in done_any - done_main if c.split("-")[0] in lanes})
+    # compare DONE entries, not card ids, so a second "L2-fix..." round is still noticed
+    keys = lambda ents: {(c, e["time"]) for c, es in ents.items() for e in es if e["status"] == "DONE"}
+    needs_merge = sorted({c.split("-")[0] for c, _ in keys(all_entries) - keys(main_entries) if c.split("-")[0] in lanes})
     return {
         "now": now.strftime("%Y-%m-%d %H:%M"),
         "dispatch": dispatch,
-        "in_flight": in_flight,
+        "in_flight": in_flight + extra,
         "stale": stale_cards,
         "blocked": blocked,
         "needs_merge": needs_merge,
@@ -98,10 +112,8 @@ def main_ref() -> str:
     return "refs/remotes/origin/main" if git("rev-parse", "--verify", "-q", "refs/remotes/origin/main").strip() else "refs/heads/main"
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--fetch", action="store_true")
-    if ap.parse_args().fetch:
+def state(fetch: bool = False) -> dict:
+    if fetch:
         git("fetch", "--all", "--quiet")
     plan = load_plan()
     ref = main_ref()
@@ -111,7 +123,13 @@ def main() -> None:
         if t:
             main_texts.append(t)
         all_texts.extend(versions(lane))
-    print(json.dumps(compute(plan, group(main_texts), group(all_texts), datetime.now()), indent=1))
+    return compute(plan, group(main_texts), group(all_texts), datetime.now())
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--fetch", action="store_true")
+    print(json.dumps(state(ap.parse_args().fetch), indent=1))
 
 
 if __name__ == "__main__":

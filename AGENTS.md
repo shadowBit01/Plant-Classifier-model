@@ -13,7 +13,7 @@ fixed folder `PCM-LX` (a git worktree on `lane/LX-...`, also a T3 project). The 
 
 | T3 provider | Lanes |
 |---|---|
-| Claude | Dispatcher/lead (main checkout), L3 core-ml, L6 integration + L6-m merges, L7 pitch |
+| Claude | Dispatcher/lead (main checkout, merges with `scripts/merge_lanes.py`), L3 core-ml, L6 integration, L7 pitch |
 | Antigravity A | L1 data-eval, L2 encoders (only lane allowed on the GPU) |
 | Antigravity B | L4 context, L5 app |
 
@@ -34,7 +34,8 @@ Lane details, owned files and task cards: `docs/TASKS.md`. Ownership rules: `doc
 2. Read, in this order: this file, `vanalens/contracts.py`, `vanalens/config.py`, your own `worklog/<LANE>.md`.
    Run `python scripts/status.py` to see what other lanes have finished or need. Do not read other lanes' code
    or worklogs beyond that board.
-3. Append a STARTED entry to `worklog/<LANE>.md` (template in section 6).
+3. Append a STARTED entry to `worklog/<LANE>.md` (template in section 6), then commit and push it immediately:
+   the dispatcher only sees committed entries and would otherwise start a duplicate thread for your card.
 
 ## 2. Stay in your lane
 - Edit ONLY files your lane owns (`docs/OWNERS`). A pre-commit hook rejects anything else.
@@ -49,15 +50,18 @@ Lane details, owned files and task cards: `docs/TASKS.md`. Ownership rules: `doc
 - Commit messages start with your lane: `[L3] fit temperature on cal split`.
 - Your branch on GitHub is `lane/<LANE>-...` (see `docs/TASKS.md`). Whatever your local branch is called (T3 Code
   may name worktree branches itself), push with `git push origin HEAD:lane/<LANE>-...`.
-- At card start: `git pull --rebase origin lane/<LANE>-...` then `git pull --rebase origin main` (files are disjoint).
-- Never commit to or push `main`; only the L6 merge step (Claude, main checkout) or the human merges.
-  It logs merges in `worklog/MERGE.md`.
+- At card start: `git pull --no-rebase --no-edit origin lane/<LANE>-...` then
+  `git pull --no-rebase --no-edit origin main` (files are disjoint, so this merge is clean).
+- Never rebase, amend or squash commits you have pushed: the push would be rejected and force-push is blocked.
+  If a push is rejected, `git pull --no-rebase --no-edit origin <your branch>` and push again.
+- Never commit to or push `main`; only the dispatcher (`scripts/merge_lanes.py`, main checkout) or the human
+  merges. Merges are logged in `worklog/MERGE.md`; a failed merge comes back to your lane as a fix card.
 
 ## 4. Spend tokens carefully
 - Navigate code with `codegraph_explore` before grep/Read. Never Read a whole large file to find one function.
 - Never print datasets, embeddings, model outputs or full logs. Use `head -n 20`, `tail -n 30`, `wc -l`,
   or a one-line `python -c` summary (shapes, counts, means).
-- One task card per thread. When the card is done, write the DONE entry and stop; the human opens a new thread.
+- One task card per thread. When the card is done, write the DONE entry and stop; the dispatcher opens a new thread.
 
 ## 5. Data, caches, GPU, safety
 - Machine is Windows. Claude Code runs commands in Git Bash, Antigravity likely in PowerShell: use the right syntax
@@ -71,12 +75,14 @@ Lane details, owned files and task cards: `docs/TASKS.md`. Ownership rules: `doc
   fixtures or cached `.npz` files.
 - Long jobs: run in the background with output to `runs/logs/<name>.log` (bash `nohup ... &`, PowerShell
   `Start-Process ... -RedirectStandardOutput`), then check the last 30 lines.
-- Never run destructive commands (`rm -rf`, `git reset --hard`, `git push --force`, deleting caches) without the
-  human approving that exact command.
+- Never run destructive commands (`rm -rf`, `Remove-Item`, `git reset --hard`, `git clean`, `git push --force`,
+  `git branch -D`, deleting caches). Permission rules block them anyway; find a non-destructive way or write BLOCKED.
+- Never enter plan mode or wait for approval: nobody is there to approve.
 
 ## 6. Worklog (mandatory)
 `worklog/<LANE>.md` is append-only and owned by that lane alone. Add an entry when a card starts, when it ends,
-and when you get blocked. Keep each entry at most 8 lines. Exact format (the status board parses it):
+and when you get blocked. Keep each entry at most 8 lines. Append with your file-editing tool, never with shell
+redirection (`>>` / `echo` in PowerShell 5.1 writes UTF-16). Exact format (the status board parses it):
 
 ```
 ## 2026-11-15 02:10 | L3-a | STARTED

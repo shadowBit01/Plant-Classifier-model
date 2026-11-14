@@ -1,9 +1,11 @@
 """Lane L1 (data-eval). Dataset loaders, grouped splits, manifests. Tests: tests/test_eval.py
 
 Expected raw layouts under DATA_DIR (inspect with `find $VANALENS_DATA/<name> -maxdepth 2 | head`):
-  dimpsar/        as downloaded from Mendeley (10.17632/748f8jkphb), folder per species
-  plantnet300k/   images/{train,val,test}/<species_id>/*.jpg + plantnet300K_species_id_2_name.json
-  campus/         <Genus species>/*.jpg, optional meta.csv (image,lat,lon,organ,plant_id)
+  inat_india/     <Genus species>/<obs_id>.jpg + meta.csv (image,lat,lon,obs_id,observed_on,license,url);
+                  built automatically by card L1-b from the iNaturalist API (primary evaluation set)
+  dimpsar/        optional; as downloaded from Mendeley (10.17632/748f8jkphb), folder per species
+  plantnet300k/   optional (disabled); images/{train,val,test}/<species_id>/*.jpg + plantnet300K_species_id_2_name.json
+  campus/         optional; <Genus species>/*.jpg, optional meta.csv (image,lat,lon,organ,plant_id)
 Every loader returns (samples, taxa) with taxa idx 0..C-1 sorted by species name, and writes
 DATA_DIR/<name>/labels.json via contracts.save_taxa. Genus = first word of species; family from a
 lookup (GBIF species/match, cached) or "" if unknown.

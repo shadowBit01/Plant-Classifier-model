@@ -1,7 +1,8 @@
 # HANDOFF: context for the lead Claude thread in T3 Code
 
 Written 15 Nov 2026, 02:05 IST, when work moved from a claude.ai chat into T3 Code. The lead thread can't see that
-chat; this file is the record of what was decided. Human-owned: the lead edits it on `main` only when asked.
+chat; this file is the record of what was decided. Human-owned: only the human or the dispatcher (on `main`)
+edits it, and every change gets a line in the decisions log at the end.
 
 ## The project
 - 24-hour build, research to training to final pitch: a plant species classifier. Input: one or more JPEG/PNG
@@ -23,8 +24,8 @@ chat; this file is the record of what was decided. Human-owned: the lead edits i
    species, GPS on every photo, test = observations from July 2025 on, after BioCLIP 2's data cutoff, so
    contamination-free; also the set where the geo prior is measured). DIMPSAR and campus photos are optional
    extras if they appear in `$VANALENS_DATA`. Pl@ntNet-300K (L2-d) is disabled by default.
-6. Baselines: B0 Pl@ntNet API (production; unfair on Pl@ntNet-300K, fair on DIMPSAR + campus), B1 Pl@ntNet-300K
-   repo ResNet weights, B2 BioCLIP 2 zero-shot, B3 DINOv3 linear probe, B4 general VLM open-ended (expect about 17%).
+6. Baselines: B0 Pl@ntNet API (production; fair on the inat_india test split, DIMPSAR and campus), B1 Pl@ntNet-300K
+   repo ResNet weights (only if L2-d is enabled), B2 BioCLIP 2 zero-shot, B3 DINOv3 linear probe, B4 general VLM open-ended (expect about 17%).
 7. Metrics: top-1, top-5, macro top-1, set size at 90% coverage, ECE, genus/family accuracy, open-set AUROC,
    few-shot curve (1/5/10), latency.
 8. Caveat to say on the results slide: BioCLIP 2 trained on GBIF data, and Pl@ntNet publishes to GBIF, so
@@ -32,40 +33,44 @@ chat; this file is the record of what was decided. Human-owned: the lead edits i
 
 ## Setup facts
 - One machine: Lenovo LOQ, RTX 3050 6 GB, 16 GB RAM, **Windows** (PowerShell 5.1; Claude Code uses Git Bash).
-  Setup via `scripts/setup.ps1`; venv Python is `$VANALENS_PY`. Big embedding jobs can go to Kaggle (2x T4).
-- Repo: GitHub `Plant-Classifier-model`. Scaffold = frozen `vanalens/contracts.py`, stubs with exact
-  docstrings, 38 tests, `docs/TASKS.md` task cards, `docs/OWNERS` + pre-commit hook, `worklog/<LANE>.md`,
-  `scripts/status.py`, merge card L6-m.
-- T3 providers: Claude (L3 core-ml, L6 integration, L6-m merges, lead), Antigravity A (L1 data-eval, L2 encoders,
+  Setup via `scripts/setup.ps1`; venv Python is `$VANALENS_PY`.
+- Repo: GitHub `Plant-Classifier-model`. Scaffold = frozen `vanalens/contracts.py`, stubs with exact docstrings,
+  tests, `docs/TASKS.md` task cards, `docs/PLAN.json` (cards, deps, lanes, providers), `docs/OWNERS` + pre-commit
+  hook, `worklog/<LANE>.md`, `scripts/status.py` board.
+- Autopilot: a Claude dispatcher (`docs/DISPATCHER.md`) runs every 30 min in the main checkout (T3 project
+  `PCM-main`). `scripts/next_cards.py` decides what can start; `scripts/merge_lanes.py` merges finished lanes
+  behind ownership + gate tests; `scripts/card_prompt.py` prints the exact prompt; threads start through T3's MCP.
+- Each lane works in a fixed folder `..\PCM-LX` (git worktree on `lane/LX-...`, T3 project `PCM-LX`). Lanes merge
+  main in (`git pull --no-rebase`), never rebase.
+- T3 providers: Claude (dispatcher, L3 core-ml, L6 integration, L7 pitch), Antigravity A (L1 data-eval, L2 encoders,
   only lane on the GPU), Antigravity B (L4 context, L5 app). At most 2 threads per provider. Claude threads share
-  one plan limit. Lanes are tied to files, not accounts: if one Antigravity account runs out, the other continues.
-- CodeGraph installed; agents run `codegraph init` in their worktree if missing.
-- `VANALENS_LLM_KEY` (not `ANTHROPIC_API_KEY`) is for runtime LLM calls; it may be empty. If empty: a Claude thread
-  writes the traits JSON directly, and the reranker is cut.
+  one plan limit. Lanes are tied to files, not accounts: the dispatcher can move a lane to another provider.
+- CodeGraph installed; agents run `codegraph init` in their folder if missing.
+- `VANALENS_LLM_KEY` (not `ANTHROPIC_API_KEY`) is for runtime LLM calls; it may be empty. If empty: L4 writes the
+  traits JSON itself, and the reranker and B4 are cut.
 
 ## Background docs
 - `docs/RESEARCH.md`: full research report (datasets with links, 15 papers, baselines, system design, 24h
   schedule, tooling, 8-slide pitch outline, risks). Read only the section you need; do not load it whole.
-- `docs/SETUP_T3_ANTIGRAVITY.md`: machine and provider setup.
+- `docs/AUTOPILOT.md`: one-time setup for autopilot. `docs/SETUP_T3_ANTIGRAVITY.md`: manual mode.
 
 ## Plan and gates
 | Hours | Work | Gate |
 |---|---|---|
-| 0-1 | Setup, downloads, DINOv3 license | tests collect, branches pushed |
-| 1-6 | Wave 1: L3-a, L1-a, L2-a, L4-a, L5-a; then L1-b, L2-b, L2-c, L1-c | lane tests green, baseline JSONs |
-| 6-9 | L3-b, L6-a, L4-b | **MVP: real pipeline answers a campus photo** |
-| 9-16 | L6-b final table, L5-b Space, optional L2-d | `runs/L6/final.json` |
+| 0-1 | Setup, worktrees, T3 projects, schedule | tooling tests green, smoke test dispatches 5 cards |
+| 1-6 | Wave 1: L1-a, L2-a, L3-a, L4-a, L5-a; then L1-b (inat_india), L2-b, L2-c, L1-c | lane tests green, embeddings, baseline JSONs |
+| 6-9 | L3-b, L4-b, L6-a | **MVP: real pipeline answers an inat_india test photo** |
+| 9-16 | L6-b final table, L5-b Space | `runs/L6/final.json` |
 | 16-19 | Fixes only | **feature freeze at hour 19** |
-| 19-24 | Pitch deck (outline in RESEARCH.md section 10), demo video, rehearsal | submit |
+| 19-24 | L7-a deck (`pitch/VanaLens.pptx`, script, demo steps); human rehearses | submit |
 
 Cut ladder if behind: reranker, then geo prior, then DINOv3 (BioCLIP 2 only), then text prototypes.
-Never cut: baseline table, conformal sets, evidence panel, campus test.
+Never cut: baseline table, conformal sets, evidence panel, inat_india test split.
 
-## Open human to-dos (as of handoff)
-- Copy scaffold into the repo, run `scripts/setup.ps1`, push all branches, set API-key vars with setx, relaunch T3.
-- Accept the DINOv3 license, `hf auth login`.
-- Download DIMPSAR to `~/vanalens-data/dimpsar/` (unlocks L1-b). Optional: Pl@ntNet-300K (31.7 GB).
-- Pl@ntNet API key. Campus photos in daylight: `~/vanalens-data/campus/<Genus species>/*.jpg`, GPS on.
+## Open human to-dos
+- Follow `docs/AUTOPILOT.md` once. Optional: `setx PLANTNET_API_KEY`, `setx VANALENS_LLM_KEY`, DINOv3 license,
+  DIMPSAR or campus photos in `$VANALENS_DATA` before L1-b runs.
+- Act on any `Needs: HUMAN:` line in `worklog/DISPATCH.md`. Rehearse with the deck at the end.
 
 ## How the human likes to work
 - Direct, terse, actionable specifics. No em dashes in any writing.
@@ -77,3 +82,5 @@ Never cut: baseline table, conformal sets, evidence panel, campus test.
 - 02:50 Autopilot mode: dispatcher (docs/DISPATCHER.md) runs on a schedule, starts cards from docs/PLAN.json via
   T3 MCP, merges, routes BLOCKED items, may edit human-owned files with a logged decision. Added L7 pitch lane.
   inat_india replaces manual downloads as the primary dataset.
+- 03:40 Final audit: merges go through scripts/merge_lanes.py (lane gate tests, abort on red, failures routed
+  as fix cards); lanes merge main instead of rebasing; B4 added to L4-b; L6-b no longer merges.

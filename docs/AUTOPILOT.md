@@ -1,27 +1,38 @@
 # Autopilot: the agents finish the project on their own
 
 A Claude **dispatcher** wakes every 30 minutes in the main checkout. `scripts/next_cards.py` tells it which task
-cards are ready (dependencies merged, lane idle, provider under its 2-thread cap). It merges finished lanes,
+cards are ready (dependencies merged, lane idle, provider under its 2-thread cap). It merges finished lanes with
+`scripts/merge_lanes.py` (ownership check + gate tests, red merges are aborted and sent back as fix cards),
 routes BLOCKED requests, starts new threads through T3's MCP server, logs to `worklog/DISPATCH.md`, and stops.
 Lane agents follow AGENTS.md section 0b: never ask, use the card's fallback, or log BLOCKED and stop.
 The data is built automatically (iNaturalist), and lane L7 writes the deck. Your remaining jobs are below.
 
 ## One-time setup (about 25 minutes, PowerShell, one line at a time)
 
-**1. Put this version in the repo** (from the main checkout, `C:\Users\divya\Plant-Classifier-model`):
+**1. Put this version in the repo.** Open a NEW PowerShell window (so `$env:VANALENS_PY` from setup.ps1 exists),
+then in the main checkout `C:\Users\divya\Plant-Classifier-model`:
 ```powershell
-Expand-Archive "$HOME\Downloads\vanalens-scaffold.zip" -DestinationPath "$env:TEMP\vl2" -Force
-Copy-Item "$env:TEMP\vl2\vanalens\*" . -Recurse -Force
-& $env:VANALENS_PY -m pip install python-pptx matplotlib
-& $env:VANALENS_PY -m pytest -q tests/test_tooling.py
+cd C:\Users\divya\Plant-Classifier-model
+git checkout main
+git pull origin main
+Expand-Archive "$HOME\Downloads\vanalens-final.zip" -DestinationPath "$env:TEMP\vl-final" -Force
+Copy-Item "$env:TEMP\vl-final\vanalens\*" . -Recurse -Force
+& $env:VANALENS_PY -m pip install -r requirements.txt -q
+& $env:VANALENS_PY -m pytest -q tests\test_tooling.py
+git checkout -- worklog
 git add -A
-git commit -m "autopilot: plan, dispatcher, worktrees, L7 pitch"
+git commit -m "autopilot: final scaffold"
 git push origin main
 ```
-The pytest line should print 9 passed.
+The pytest line must print `14 passed`. (The lane tests fail on purpose until the agents implement them.)
+`git checkout -- worklog` keeps any worklog entries already in your repo instead of the empty templates.
+If `$env:VANALENS_PY` is empty, run `powershell -ExecutionPolicy Bypass -File scripts\setup.ps1` first, then open a
+new window.
 
 **2. Create the lane folders**: `powershell -ExecutionPolicy Bypass -File scripts\make_worktrees.ps1`
-It creates `..\PCM-L1` to `..\PCM-L7`, each on its lane branch, with `.lane` and a CodeGraph index.
+It creates `..\PCM-L1` to `..\PCM-L7`, each on its lane branch, with `.lane` and a CodeGraph index. Safe to run
+again: existing folders are kept, and every card merges the latest main into its lane when it starts.
+Then fully quit T3 (also from the tray) and reopen it, so threads see the variables setup.ps1 saved.
 
 **3. Add 8 projects in T3** with exactly these names: `PCM-main` (the main checkout) and `PCM-L1` to `PCM-L7`
 (the new folders). Provider display names must be exactly `Claude`, `Antigravity A`, `Antigravity B`.
@@ -80,6 +91,8 @@ fallback loop at the bottom of `docs/DISPATCHER.md` in one Claude thread instead
 
 ## Your remaining jobs
 - Glance at progress when you're up: `& $env:VANALENS_PY scripts\status.py --fetch`, or `worklog/DISPATCH.md`.
+- While it runs, don't edit, commit or pull in the main checkout or the `PCM-L*` folders: the dispatcher needs a
+  clean main checkout to merge, and each lane folder belongs to its agent. To look, use GitHub or `git log`.
 - Anything under `Needs: HUMAN:` in DISPATCH.md is for you.
 - Present: `pitch/VanaLens.pptx`, `pitch/script.md`, `pitch/demo.md` (on `main` once L7-a is merged).
 
@@ -89,5 +102,6 @@ fallback loop at the bottom of `docs/DISPATCHER.md` in one Claude thread instead
 | Claude 5-hour limit | Dispatcher and Claude lanes pause until reset | Schedule keeps retrying; Antigravity threads finish their cards |
 | One Antigravity account out of quota | Its lanes stall | Dispatcher moves the lane to another provider in PLAN.json |
 | Laptop sleeps, reboots, or T3 closes | Everything stops | Step 7; restart T3 and the schedule resumes |
-| An agent makes a mess | Bad code on its own branch only | Ownership hook, tests before merge, deny lists, every card committed |
+| An agent makes a mess | Bad code on its own branch only | Ownership hook, gate tests before merge (red merges are aborted), deny lists |
+| A lane can't get its merge green | That lane's later cards wait | Fix cards go back to the lane; after 3 rounds the fix goes to Claude |
 | T3 MCP can't start threads | Dispatch step fails | Dispatcher writes `Needs: HUMAN: start <card> in <project>`; you paste `scripts/card_prompt.py <card>` output |

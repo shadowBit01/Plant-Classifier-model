@@ -17,11 +17,14 @@ HEAD_RE = re.compile(r"^## (\d{4}-\d{2}-\d{2} \d{2}:\d{2}) \| ([^|]+?) \| (START
 
 
 def git(*args: str) -> str:
-    r = subprocess.run(["git", *args], cwd=REPO, capture_output=True, text=True, check=False)
+    r = subprocess.run(["git", *args], cwd=REPO, capture_output=True, text=True, encoding="utf-8",
+                       errors="replace", check=False)
     return r.stdout if r.returncode == 0 else ""
 
 
 def parse(text: str) -> list[dict]:
+    # tolerate files partly written as UTF-16 by PowerShell (NULs, BOM replacement chars)
+    text = text.replace("\x00", "").replace("\ufffd", "").replace("\ufeff", "")
     entries: list[dict] = []
     cur: dict | None = None
     for line in text.splitlines():
@@ -40,7 +43,7 @@ def parse(text: str) -> list[dict]:
 def versions(lane: str):
     f = REPO / "worklog" / f"{lane}.md"
     if f.exists():
-        yield f.read_text()
+        yield f.read_text(encoding="utf-8", errors="replace")
     for ref in git("for-each-ref", "--format=%(refname)", "refs/heads", "refs/remotes").splitlines():
         text = git("show", f"{ref}:worklog/{lane}.md")
         if text:
@@ -64,12 +67,12 @@ def main() -> None:
     if ap.parse_args().fetch:
         git("fetch", "--all", "--quiet")
     rows = [(lane, latest(lane)) for lane in LANES + ("MERGE", "DISPATCH")]
-    print(f"{'LANE':5} {'UPDATED':17} {'CARD':8} {'STATUS':8} {'NEXT'}")
+    print(f"{'LANE':9} {'UPDATED':17} {'CARD':13} {'STATUS':8} {'NEXT'}")
     for lane, e in rows:
         if e is None:
-            print(f"{lane:5} {'-':17} {'-':8} {'idle':8}")
+            print(f"{lane:9} {'-':17} {'-':13} {'idle':8}")
         else:
-            print(f"{lane:5} {e['time']:17} {e['card'][:8]:8} {e['status']:8} {e['next'][:60]}")
+            print(f"{lane:9} {e['time']:17} {e['card'][:13]:13} {e['status']:8} {e['next'][:60]}")
     needs = [(lane, e["needs"]) for lane, e in rows if e and e["needs"] and e["needs"].lower() != "none"]
     if needs:
         print("\nOPEN NEEDS")

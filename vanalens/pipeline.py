@@ -76,7 +76,7 @@ class MockPipeline:
         self.taxa.append(Taxon(len(self.taxa), taxon.species, taxon.genus, taxon.family))
 
 
-def get_pipeline(dataset: str = "campus"):
+def get_pipeline(dataset: str = "inat_india"):
     """VANALENS_MOCK=1 -> MockPipeline, else the real VanaLens."""
     if os.environ.get("VANALENS_MOCK") == "1":
         return MockPipeline()

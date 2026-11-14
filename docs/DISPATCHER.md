@@ -7,9 +7,16 @@ Context if you need it: docs/HANDOFF.md (decisions), docs/PLAN.json (cards, lane
 Python is the venv interpreter in $VANALENS_PY (bash: "$VANALENS_PY", PowerShell: & $env:VANALENS_PY).
 
 Every run, in order:
-1. `git pull --rebase origin main`, then run `scripts/next_cards.py --fetch` and read its JSON.
-2. MERGE. If `needs_merge` is non-empty: print `scripts/card_prompt.py L6-m` and do exactly that card here
-   (ownership check per lane, merge, pytest, push main, log to worklog/MERGE.md). Then run next_cards.py again.
+1. `git pull --no-rebase --no-edit origin main`, then run `scripts/next_cards.py --fetch` and read its JSON.
+   If `git status` shows uncommitted changes left by an earlier run: commit them if they are dispatcher files
+   (docs/*, worklog/DISPATCH.md), otherwise `git stash push -m autopilot` and note it under `Needs: HUMAN:`.
+2. MERGE. If `needs_merge` is non-empty: run `scripts/merge_lanes.py` (it does ownership check, merge, the
+   lane's gate tests, commit or abort, MERGE log and push by itself). Never merge by hand. For each item in its
+   `failed` list: if the lane is idle (not in `in_flight`), start a thread for that lane with
+   `scripts/card_prompt.py --fix <LANE> "merge into main failed (<reason>): <last lines of detail>. Fix it on your
+   branch so your lane's tests and the merged lanes' tests pass."` (lane "-" means the push failed: just retry next
+   run). If one lane has failed to merge after 3 fix
+   rounds, send the next fix with provider Claude instead. Then run next_cards.py again.
 3. BLOCKED. For each item in `blocked`, read its Needs:
    - another lane must change something and that lane is idle (not in `in_flight`): start a thread for that
      lane with the text from `scripts/card_prompt.py --fix <LANE> "<request>"`;
@@ -30,7 +37,8 @@ Every run, in order:
 6. Append one entry to worklog/DISPATCH.md (card DISPATCH, status DONE; Did: merged lanes, dispatched cards,
    blocked items and action; Next: what you expect next run). Commit "[DISPATCH] ..." and push main. Stop.
 
-Never write lane code. Never force-push. Keep each run under 10 minutes.
+Never write lane code. Never force-push. Never enter plan mode. Keep each run under 10 minutes.
+Count fix rounds and BLOCKED runs from worklog/DISPATCH.md and worklog/MERGE.md, not from memory.
 ```
 
 ## Fallback if scheduled tasks can't start a Claude thread on a timer

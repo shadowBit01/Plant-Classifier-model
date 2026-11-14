@@ -133,3 +133,51 @@ def test_every_plan_card_has_a_prompt():
         if c["id"] != "L6-m":
             lane = c["id"].split("-")[0]
             assert f"worklog/{lane}.md" in text and PLAN["lanes"][lane]["branch"] in text
+            assert f"start {c['id']}" in text, f"{c['id']} must commit its STARTED entry immediately"
+
+
+def test_card_prompts_merge_never_rebase():
+    tasks = (REPO / "docs" / "TASKS.md").read_text(encoding="utf-8")
+    assert "pull --rebase" not in tasks
+    for c in PLAN["cards"]:
+        assert "--no-rebase" in cp.extract(tasks, c["id"])
+    fix = cp.fix_prompt("L2", "encode_text must return float32")
+    assert "--no-rebase" in fix and "lane/L2-encoders" in fix and "float32" in fix
+    import re
+    assert re.fullmatch(r"L2-fix\d{6}", fix.split("STARTED entry for ")[1].split()[0])   # unique per round
+
+
+def test_fix_card_keeps_lane_busy():
+    from datetime import datetime
+    now = datetime(2026, 11, 15, 4, 0)
+    allx = {"L3-fix150350": [_e("2026-11-15 03:50", "L3-fix150350", "STARTED")]}
+    out = nc.compute(PLAN, {}, allx, now)
+    assert "L3-fix150350" in out["in_flight"]
+    assert "L3-a" not in [d["card"] for d in out["dispatch"]]          # lane L3 is busy with the fix
+
+
+def test_second_fix_round_needs_merge():
+    from datetime import datetime
+    now = datetime(2026, 11, 15, 6, 0)
+    done1 = _e("2026-11-15 04:00", "L3-fix", "DONE")
+    done2 = _e("2026-11-15 05:30", "L3-fix", "DONE")
+    out = nc.compute(PLAN, {"L3-fix": [done1]}, {"L3-fix": [done1, done2]}, now)
+    assert out["needs_merge"] == ["L3"]
+
+
+def test_status_parse_tolerates_windows_encodings():
+    text = "﻿## 2026-11-15 02:10 | L3-a | STARTED\r\n- Needs: none\r\n"
+    assert [e["card"] for e in st.parse(text)] == ["L3-a"]
+    garbled = "## 2026-11-15 02:10 | L1-a | DONE\n".encode("utf-16-le").decode("utf-8", errors="replace")
+    assert [e["status"] for e in st.parse(garbled)] == ["DONE"]
+
+
+def test_merge_gate_selection(tmp_path):
+    ml = _load("merge_lanes")
+    (tmp_path / "tests").mkdir()
+    for f in ("test_tooling.py", "test_eval.py", "test_core.py", "test_context.py", "test_l3_extra.py"):
+        (tmp_path / "tests" / f).write_text("")
+    gate = ml.gate_tests(PLAN, "L3", green={"L1"}, root=tmp_path)
+    assert gate == ["tests/test_tooling.py", "tests/test_eval.py", "tests/test_core.py", "tests/test_l3_extra.py"]
+    assert "tests/test_context.py" not in gate                       # L4 not merged yet: its stubs would fail
+    assert ml.gate_tests(PLAN, "L7", green=set(), root=tmp_path) == ["tests/test_tooling.py"]

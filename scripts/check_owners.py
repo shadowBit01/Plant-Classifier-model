@@ -23,7 +23,7 @@ LANES = ("L1", "L2", "L3", "L4", "L5", "L6", "L7")
 
 def load_owners(path: Path = REPO / "docs" / "OWNERS") -> dict[str, list[str]]:
     owners: dict[str, list[str]] = {}
-    for raw in Path(path).read_text().splitlines():
+    for raw in Path(path).read_text(encoding="utf-8").splitlines():
         line = raw.split("#", 1)[0].strip()
         if line:
             lane, pat = line.split(None, 1)
@@ -58,7 +58,8 @@ def owner_of(path: str, owners: dict[str, list[str]]) -> str:
 
 
 def git(*args: str) -> str:
-    r = subprocess.run(["git", *args], cwd=REPO, capture_output=True, text=True, check=False)
+    r = subprocess.run(["git", *args], cwd=REPO, capture_output=True, text=True, encoding="utf-8",
+                       errors="replace", check=False)
     return r.stdout.strip()
 
 
@@ -93,6 +94,16 @@ def violations(paths: list[str], lane: str, owners: dict[str, list[str]]) -> lis
     return [(p, owner_of(p, owners)) for p in paths if p and not allowed(p, lane, owners)]
 
 
+def main_ref() -> str:
+    return "origin/main" if git("rev-parse", "-q", "--verify", "origin/main") else "main"
+
+
+def reverts_to_main(path: str) -> bool:
+    """Staged version of `path` equals main's version (undoing an earlier out-of-lane change is allowed)."""
+    staged, base = git("rev-parse", "-q", "--verify", f":{path}"), git("rev-parse", "-q", "--verify", f"{main_ref()}:{path}")
+    return staged == base
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--lane")
@@ -115,8 +126,15 @@ def main(argv: list[str] | None = None) -> int:
         paths = git("diff", "--name-only", a.range).splitlines()
     else:
         paths = git("diff", "--cached", "--name-only").splitlines()
+        if git("rev-parse", "-q", "--verify", "MERGE_HEAD"):
+            # committing a merge (e.g. main into a lane after a conflict): files identical to the merged-in
+            # side came from there; only check what this commit changes relative to both parents
+            theirs = set(git("diff", "--cached", "--name-only", "MERGE_HEAD").splitlines())
+            paths = [p for p in paths if p in theirs]
 
     bad = violations(paths, lane, load_owners())
+    if not a.files and not a.range:
+        bad = [(p, o) for p, o in bad if not reverts_to_main(p)]
     if bad:
         print(f"check_owners: lane {lane} may not change:")
         for p, o in bad:

@@ -19,14 +19,16 @@ chat; this file is the record of what was decided. Human-owned: the lead edits i
    more than one species (RAR-style, choose from a short list; VLMs are weak open-ended).
 4. Pitch angle: add a species with 5 photos and no retraining; honest uncertainty with a guarantee; evidence
    photos + matched traits; location-aware; a second photo shrinks the set.
-5. Eval sets: DIMPSAR Indian medicinal (80 leaf species / 40 whole-plant), Pl@ntNet-300K subset (credible
-   benchmark), 15-20 campus species shot by the team (the only contamination-free set).
+5. Eval sets: **inat_india** (built automatically by L1-b from the iNaturalist API: 60 common Madhya Pradesh plant
+   species, GPS on every photo, test = observations from July 2025 on, after BioCLIP 2's data cutoff, so
+   contamination-free; also the set where the geo prior is measured). DIMPSAR and campus photos are optional
+   extras if they appear in `$VANALENS_DATA`. Pl@ntNet-300K (L2-d) is disabled by default.
 6. Baselines: B0 Pl@ntNet API (production; unfair on Pl@ntNet-300K, fair on DIMPSAR + campus), B1 Pl@ntNet-300K
    repo ResNet weights, B2 BioCLIP 2 zero-shot, B3 DINOv3 linear probe, B4 general VLM open-ended (expect about 17%).
 7. Metrics: top-1, top-5, macro top-1, set size at 90% coverage, ECE, genus/family accuracy, open-set AUROC,
    few-shot curve (1/5/10), latency.
 8. Caveat to say on the results slide: BioCLIP 2 trained on GBIF data, and Pl@ntNet publishes to GBIF, so
-   Pl@ntNet-derived zero-shot numbers may be optimistic. Report campus results separately.
+   older or Pl@ntNet-derived images may be in its training data. Headline numbers come from the post-July-2025 test split.
 
 ## Setup facts
 - One machine: Lenovo LOQ, RTX 3050 6 GB, 16 GB RAM, **Windows** (PowerShell 5.1; Claude Code uses Git Bash).
@@ -72,3 +74,6 @@ Never cut: baseline table, conformal sets, evidence panel, campus test.
 ## Decisions log (append below, newest last)
 - 02:05 Work moved to T3 Code. Lead thread = Claude in the main checkout (no worktree).
 - 02:10 Machine is Windows: added setup.ps1, .gitattributes (LF for hooks), Python-finding hook, UTF-16-safe .lane.
+- 02:50 Autopilot mode: dispatcher (docs/DISPATCHER.md) runs on a schedule, starts cards from docs/PLAN.json via
+  T3 MCP, merges, routes BLOCKED items, may edit human-owned files with a logged decision. Added L7 pitch lane.
+  inat_india replaces manual downloads as the primary dataset.

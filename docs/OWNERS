@@ -1,7 +1,7 @@
 # File ownership. One "<LANE> <pattern>" per line.
 # pattern: exact path, a directory ending in "/", or a prefix ending in "*".
 # Every lane also owns worklog/<LANE>.md, runs/<LANE>/ and tests/test_<lane lowercase>_* automatically.
-# HUMAN-owned files may only be changed on main by the human (or L6 when the human asks).
+# HUMAN-owned files may only be changed on main by the human or the dispatcher (lead), with a decision logged in docs/HANDOFF.md.
 
 L1 vanalens/data.py
 L1 eval/
@@ -38,10 +38,15 @@ L6 tests/test_pipeline.py
 L6 requirements.txt
 L6 README.md
 
+L7 pitch/
+L7 scripts/build_deck.py
+
 HUMAN AGENTS.md
 HUMAN CLAUDE.md
 HUMAN docs/
 HUMAN worklog/MERGE.md
+HUMAN worklog/DISPATCH.md
+HUMAN .claude/
 HUMAN vanalens/contracts.py
 HUMAN vanalens/config.py
 HUMAN vanalens/__init__.py
@@ -49,6 +54,9 @@ HUMAN tests/conftest.py
 HUMAN tests/test_tooling.py
 HUMAN scripts/check_owners.py
 HUMAN scripts/status.py
+HUMAN scripts/next_cards.py
+HUMAN scripts/card_prompt.py
+HUMAN scripts/make_worktrees.ps1
 HUMAN scripts/setup.sh
 HUMAN scripts/setup.ps1
 HUMAN .gitattributes

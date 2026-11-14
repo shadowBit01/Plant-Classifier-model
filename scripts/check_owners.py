@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-LANES = ("L1", "L2", "L3", "L4", "L5", "L6")
+LANES = ("L1", "L2", "L3", "L4", "L5", "L6", "L7")
 
 
 def load_owners(path: Path = REPO / "docs" / "OWNERS") -> dict[str, list[str]]:
@@ -67,7 +67,7 @@ def read_lane_file(path: Path) -> str | None:
     raw = path.read_bytes()
     for enc in ("utf-16", "utf-8-sig") if raw[:2] in (b"\xff\xfe", b"\xfe\xff") else ("utf-8-sig", "latin-1"):
         try:
-            m = re.search(r"L[1-6]", raw.decode(enc), re.I)
+            m = re.search(r"L[1-7]", raw.decode(enc), re.I)
             if m:
                 return m.group(0).upper()
         except UnicodeDecodeError:

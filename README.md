@@ -9,6 +9,8 @@ This repo is a **multi-agent scaffold**: frozen contracts (`vanalens/contracts.p
 
 ## Setup
 
+**Autopilot (agents finish it themselves): `docs/AUTOPILOT.md`.** Manual mode:
+
 Follow **`docs/SETUP_T3_ANTIGRAVITY.md`**: Claude + Antigravity A + Antigravity B as T3 Code providers on one machine,
 one worktree + branch per lane, ownership hook, worklogs and a status board.
 

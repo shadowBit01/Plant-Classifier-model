@@ -1,0 +1,31 @@
+{
+  "stale_minutes": 120,
+  "max_threads_per_provider": 2,
+  "lanes": {
+    "L1": {"provider": "Antigravity A", "branch": "lane/L1-data-eval",   "project": "PCM-L1", "folder": "PCM-L1"},
+    "L2": {"provider": "Antigravity A", "branch": "lane/L2-encoders",    "project": "PCM-L2", "folder": "PCM-L2"},
+    "L3": {"provider": "Claude",        "branch": "lane/L3-core-ml",     "project": "PCM-L3", "folder": "PCM-L3"},
+    "L4": {"provider": "Antigravity B", "branch": "lane/L4-context",     "project": "PCM-L4", "folder": "PCM-L4"},
+    "L5": {"provider": "Antigravity B", "branch": "lane/L5-app",         "project": "PCM-L5", "folder": "PCM-L5"},
+    "L6": {"provider": "Claude",        "branch": "lane/L6-integration", "project": "PCM-L6", "folder": "PCM-L6"},
+    "L7": {"provider": "Claude",        "branch": "lane/L7-pitch",       "project": "PCM-L7", "folder": "PCM-L7"}
+  },
+  "cards": [
+    {"id": "L1-a", "deps": []},
+    {"id": "L2-a", "deps": []},
+    {"id": "L3-a", "deps": []},
+    {"id": "L4-a", "deps": []},
+    {"id": "L5-a", "deps": []},
+    {"id": "L1-b", "deps": ["L1-a"]},
+    {"id": "L1-c", "deps": ["L1-b"]},
+    {"id": "L2-b", "deps": ["L2-a", "L1-b"]},
+    {"id": "L2-c", "deps": ["L2-a", "L1-b"]},
+    {"id": "L2-d", "deps": ["L2-c"], "enabled": false},
+    {"id": "L3-b", "deps": ["L3-a", "L2-c", "L1-a"]},
+    {"id": "L4-b", "deps": ["L4-a", "L2-a"]},
+    {"id": "L6-a", "deps": ["L3-b", "L5-a"]},
+    {"id": "L5-b", "deps": ["L5-a", "L6-a"]},
+    {"id": "L6-b", "deps": ["L6-a", "L4-b", "L1-c", "L2-b"]},
+    {"id": "L7-a", "deps": ["L6-b"]}
+  ]
+}

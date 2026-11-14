@@ -29,7 +29,7 @@ if (Get-Command codegraph -ErrorAction SilentlyContinue) { codegraph init } else
 
 # Git: ownership hook + lane branches (created from the current main)
 git config core.hooksPath .githooks
-foreach ($b in "lane/L1-data-eval", "lane/L2-encoders", "lane/L3-core-ml", "lane/L4-context", "lane/L5-app", "lane/L6-integration") {
+foreach ($b in "lane/L1-data-eval", "lane/L2-encoders", "lane/L3-core-ml", "lane/L4-context", "lane/L5-app", "lane/L6-integration", "lane/L7-pitch") {
     git show-ref -q --verify "refs/heads/$b"
     if ($LASTEXITCODE -ne 0) { git branch $b }
 }

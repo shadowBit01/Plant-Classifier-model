@@ -1,6 +1,7 @@
 # Lanes and task cards
 
-One lane = one folder (git worktree) on its own branch = one agent thread at a time. Lanes own disjoint files
+One lane = one fixed folder (git worktree `PCM-LX`, also a T3 project) on its own branch = one agent thread at a time.
+In autopilot mode the dispatcher (docs/DISPATCHER.md) starts these cards itself, using docs/PLAN.json. Lanes own disjoint files
 (`docs/OWNERS`, enforced by a pre-commit hook), so merges are trivial. Paste a card's prompt into a **new thread**.
 When a card is done, the agent writes a DONE entry in `worklog/<LANE>.md`, pushes its branch and stops; open a new
 thread for the next card. Check progress any time with `python scripts/status.py --fetch`.
@@ -15,7 +16,8 @@ thread for the next card. Check progress any time with `python scripts/status.py
 | **L4 context** | `vanalens/geo.py`, `traits.py`, `rerank.py`, `scripts/build_traits.py` | nothing; L2-a `encode_text` for L4-b protos | **Antigravity B** | `tests/test_context.py` |
 | **L5 app** | `app/*`, `space/*` | nothing (uses `MockPipeline`) | **Antigravity B** | `tests/test_app.py` |
 | **L6 integration** | `vanalens/pipeline.py` (except `MockPipeline`), `tests/test_pipeline.py`, `requirements.txt`, `README.md`, merges | L2-c, L3-b | **Claude** | `tests/test_pipeline.py` (L6 writes it) |
-| Human | `AGENTS.md`, `CLAUDE.md`, `vanalens/contracts.py`, `vanalens/config.py`, this file | | | |
+| **L7 pitch** | `pitch/*`, `scripts/build_deck.py` | L6-b final table | **Claude** | none |
+| Human / dispatcher | `AGENTS.md`, `CLAUDE.md`, `docs/*`, `vanalens/contracts.py`, `vanalens/config.py` | | | |
 
 New tests go in new files you own; never edit someone else's test.
 
@@ -48,11 +50,20 @@ When done: DONE entry in worklog/L1.md, commit with prefix [L1], `git push origi
 **L1-b**
 ```
 First write `L1` to `.lane` (see AGENTS.md section 1), use the venv Python `$VANALENS_PY` for every python/pytest command, `git pull --rebase origin lane/L1-data-eval` and `git pull --rebase origin main`, then add a STARTED entry for L1-b to worklog/L1.md (format: AGENTS.md section 6).
-Lane L1, card b. Read AGENTS.md. Implement load_dimpsar and load_campus in vanalens/data.py against the real
-folders under $VANALENS_DATA (inspect with `find ... -maxdepth 2 | head -n 30`; never list everything).
-Write scripts/make_manifests.py: for each dataset build grouped splits (gallery/cal/test), cap the gallery with
-cap_per_class, write $VANALENS_CACHE/manifests/<dataset>_<split>.jsonl and $VANALENS_DATA/<dataset>/labels.json.
-Print only per-split counts and number of classes.
+Lane L1, card b. Read AGENTS.md. Build the evaluation datasets (all automatic; nobody can download for you).
+1. inat_india (always): with the iNaturalist API v1 (api.inaturalist.org; max 1 request/s; set a User-Agent),
+   resolve the place id for Madhya Pradesh, India, then take the 60 most-observed research-grade species under
+   taxon_id 47126 (Plantae) via observations/species_counts. Per species fetch research-grade observations with
+   coordinates and a CC0 / CC-BY / CC-BY-NC photo: up to 30 observed before 2025-06-01 (gallery + cal) and up to 15
+   observed on or after 2025-07-01 (test: after BioCLIP 2's training data was collected, so contamination-free).
+   One medium photo per observation. Drop species with fewer than 5 test observations. Save
+   $VANALENS_DATA/inat_india/<Genus species>/<obs_id>.jpg and meta.csv (image,lat,lon,obs_id,observed_on,license,url).
+   Add load_inat_india to vanalens/data.py (source "inat", group = obs id, lat/lon filled).
+2. dimpsar: only if $VANALENS_DATA/dimpsar exists, implement load_dimpsar. campus: only if $VANALENS_DATA/campus
+   exists, implement load_campus. Otherwise skip them and say so in the DONE entry.
+3. scripts/make_manifests.py: for each available dataset write $VANALENS_CACHE/manifests/<dataset>_<split>.jsonl
+   (gallery/cal/test; inat_india uses the date rule, cal = 20% of pre-cutoff observations by group) and
+   $VANALENS_DATA/<dataset>/labels.json; cap gallery with cap_per_class. Print only per-split counts and classes.
 When done: DONE entry in worklog/L1.md, commit with prefix [L1], `git push origin HEAD:lane/L1-data-eval`, stop.
 ```
 
@@ -63,7 +74,8 @@ Lane L1, card c. Read AGENTS.md. Write scripts/baseline_plantnet_api.py (baselin
 from a test manifest, call the Pl@ntNet API v2 identify endpoint (read my.plantnet.org docs; key from env
 PLANTNET_API_KEY; pass the organ when known), cache each raw JSON under $VANALENS_CACHE/plantnet_api/, map returned
 species names to taxa idx (unmatched -> uniform row), and save results with eval.harness to runs/L1/b0_<dataset>.json.
-Never exceed 450 calls per day; skip images already cached.
+Never exceed 450 calls per day; skip images already cached. If PLANTNET_API_KEY is empty, write the script,
+skip the run, and mark the DONE entry 'B0 skipped: no key'.
 When done: DONE entry in worklog/L1.md, commit with prefix [L1], `git push origin HEAD:lane/L1-data-eval`, stop.
 ```
 
@@ -149,6 +161,8 @@ resolve_gbif_keys (vanalens/geo.py; try lat 23.18, lon 79.99 and print only the 
 generate_traits (anthropic SDK, key from VANALENS_LLM_KEY, model from env VANALENS_LLM_MODEL); and rerank() with
 base64 images. Write scripts/build_traits.py to generate traits for a dataset's labels.json and save text protos
 (using vanalens.encoders.Encoder.encode_text) to $VANALENS_CACHE/text/<dataset>.npz. Print 2 example species only.
+If VANALENS_LLM_KEY is empty: write the traits yourself (you are an LLM) for every species in each labels.json,
+6 per species, into the same cache JSON format, and note "reranker disabled: no key" in your DONE entry.
 When done: DONE entry in worklog/L4.md, commit with prefix [L4], `git push origin HEAD:lane/L4-context`, stop.
 ```
 
@@ -204,4 +218,18 @@ Lane L6, card b. Merge all lane branches into main, run the full test suite, the
 every baseline (B0, B1, B2, B3 = probe only) and every ablation step on dimpsar, plantnet300k (subset) and campus,
 with n per row. Print the table as markdown, nothing else.
 When done: DONE entry in worklog/L6.md, commit with prefix [L6], `git push origin HEAD:lane/L6-integration`, stop.
+```
+
+## L7 pitch
+
+**L7-a**
+```
+First write `L7` to `.lane` (see AGENTS.md section 1), use the venv Python `$VANALENS_PY` for every python/pytest command, `git pull --rebase origin lane/L7-pitch` and `git pull --rebase origin main`, then add a STARTED entry for L7-a to worklog/L7.md (format: AGENTS.md section 6).
+You are lane L7 (pitch). Read AGENTS.md, docs/HANDOFF.md, docs/RESEARCH.md section 10 only, and runs/L6/final.json.
+Write scripts/build_deck.py that builds pitch/VanaLens.pptx with python-pptx: 8 slides following the outline,
+16:9, clean light theme, one idea per slide, charts rendered with matplotlib into pitch/*.png (results vs
+baselines, ablation, few-shot curve if present). Also write pitch/script.md (speaker notes, 4 minutes total) and
+pitch/demo.md (live demo steps on the Gradio app + fallback if Wi-Fi fails). Use only numbers that exist in runs/;
+if a metric is missing, say so on the slide. No em dashes anywhere. Run the script and check the .pptx opens.
+When done: DONE entry in worklog/L7.md, commit with prefix [L7], `git push origin HEAD:lane/L7-pitch`, stop.
 ```

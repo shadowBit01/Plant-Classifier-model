@@ -8,13 +8,22 @@ Frozen encoders (BioCLIP 2 + DINOv3) -> kNN / probe / text-trait scorers -> fusi
 
 ## 0. Who does what
 
-All agents run as T3 Code threads on one machine (Lenovo LOQ, RTX 3050 6 GB), each thread in its own worktree.
+All agents run as T3 Code threads on one machine (Lenovo LOQ, RTX 3050 6 GB). Each lane always works in its own
+fixed folder `PCM-LX` (a git worktree on `lane/LX-...`, also a T3 project). The dispatcher works in the main checkout.
 
 | T3 provider | Lanes |
 |---|---|
-| Claude (main) | L3 core-ml, L6 integration, L6-m merges into `main`, reviews |
+| Claude | Dispatcher/lead (main checkout), L3 core-ml, L6 integration + L6-m merges, L7 pitch |
 | Antigravity A | L1 data-eval, L2 encoders (only lane allowed on the GPU) |
 | Antigravity B | L4 context, L5 app |
+
+## 0b. Autopilot: nobody is watching
+- Never ask the human a question or wait for a reply. Pick the most reasonable option consistent with
+  `docs/HANDOFF.md`, do it, and record the choice under `Did:` in your worklog.
+- Missing data, key or access: use the fallback written in your card (e.g. dinov2-large, skip B0, write traits
+  yourself). If none exists, write a BLOCKED entry with a precise `Needs:` and stop; the dispatcher routes it.
+- Same error twice after two different fixes: BLOCKED with the error summary, stop. Do not loop.
+- Do only your card. No refactors of other lanes, no new features beyond the card.
 
 Lane details, owned files and task cards: `docs/TASKS.md`. Ownership rules: `docs/OWNERS`.
 
@@ -29,8 +38,9 @@ Lane details, owned files and task cards: `docs/TASKS.md`. Ownership rules: `doc
 
 ## 2. Stay in your lane
 - Edit ONLY files your lane owns (`docs/OWNERS`). A pre-commit hook rejects anything else.
-- `vanalens/contracts.py`, `vanalens/config.py`, `AGENTS.md`, `docs/*` are human-owned. Need a change? Write it under
-  `Needs:` in your worklog and stop; do not work around the contract.
+- `vanalens/contracts.py`, `vanalens/config.py`, `AGENTS.md`, `docs/*` are human-owned; only the human or the
+  dispatcher (lead, on main) changes them, logging the decision in `docs/HANDOFF.md`. Need a change? Write it under
+  `Needs:` (BLOCKED if you can't continue) and stop; do not work around the contract.
 - Never edit another lane's tests or worklog. New tests go in `tests/test_<lane lowercase>_*.py` (e.g. `tests/test_l3_extra.py`).
 - Never weaken a test to make it pass.
 

@@ -79,3 +79,57 @@ def test_lane_file_encodings(tmp_path):
     assert co.read_lane_file(f) == "L2"
     f.write_text("nothing")
     assert co.read_lane_file(f) is None
+
+
+nc = _load("next_cards")
+cp = _load("card_prompt")
+PLAN = nc.load_plan(REPO / "docs" / "PLAN.json")
+
+
+def _e(time, card, status, needs="none"):
+    return {"time": time, "card": card, "status": status, "needs": needs, "next": ""}
+
+
+def test_next_cards_first_wave():
+    from datetime import datetime
+    out = nc.compute(PLAN, {}, {}, datetime(2026, 11, 15, 3, 0))
+    cards = [d["card"] for d in out["dispatch"]]
+    assert cards == ["L1-a", "L2-a", "L3-a", "L4-a", "L5-a"]   # full first wave, 2 per Antigravity account
+    assert not out["all_done"] and out["needs_merge"] == []
+
+
+def test_next_cards_provider_cap_and_flow():
+    from datetime import datetime
+    now = datetime(2026, 11, 15, 4, 0)
+    allx = {"L1-a": [_e("2026-11-15 03:00", "L1-a", "STARTED")], "L2-a": [_e("2026-11-15 03:00", "L2-a", "STARTED")]}
+    out = nc.compute(PLAN, {}, allx, now)
+    assert set(out["in_flight"]) == {"L1-a", "L2-a"}
+    assert all(d["provider"] != "Antigravity A" for d in out["dispatch"])   # A is at its 2-thread cap
+    # L1-a DONE on its branch but not merged -> needs merge, L1-b must wait
+    allx["L1-a"].append(_e("2026-11-15 03:40", "L1-a", "DONE"))
+    out = nc.compute(PLAN, {}, allx, now)
+    assert out["needs_merge"] == ["L1"] and "L1-b" not in [d["card"] for d in out["dispatch"]]
+    # merged -> L1-b dispatchable
+    out = nc.compute(PLAN, {"L1-a": allx["L1-a"]}, allx, now)
+    assert "L1-b" in [d["card"] for d in out["dispatch"]]
+
+
+def test_next_cards_stale_and_blocked():
+    from datetime import datetime
+    now = datetime(2026, 11, 15, 9, 0)
+    allx = {"L3-a": [_e("2026-11-15 05:00", "L3-a", "STARTED")],
+            "L4-a": [_e("2026-11-15 08:30", "L4-a", "BLOCKED", "L2: encode_text")]}
+    out = nc.compute(PLAN, {}, allx, now)
+    d = {x["card"]: x for x in out["dispatch"]}
+    assert d["L3-a"]["resume"] is True and out["stale"] == ["L3-a"]
+    assert out["blocked"] == [{"card": "L4-a", "needs": "L2: encode_text"}] and "L4-a" not in d
+
+
+def test_every_plan_card_has_a_prompt():
+    tasks = (REPO / "docs" / "TASKS.md").read_text(encoding="utf-8")
+    for c in PLAN["cards"] + [{"id": "L6-m"}]:
+        text = cp.extract(tasks, c["id"])
+        assert text, f"no prompt for {c['id']}"
+        if c["id"] != "L6-m":
+            lane = c["id"].split("-")[0]
+            assert f"worklog/{lane}.md" in text and PLAN["lanes"][lane]["branch"] in text

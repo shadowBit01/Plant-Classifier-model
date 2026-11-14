@@ -15,3 +15,5 @@ gradio
 anthropic
 wandb
 pytest
+python-pptx
+matplotlib

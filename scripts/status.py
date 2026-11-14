@@ -12,7 +12,7 @@ import subprocess
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-LANES = ("L1", "L2", "L3", "L4", "L5", "L6")
+LANES = ("L1", "L2", "L3", "L4", "L5", "L6", "L7")
 HEAD_RE = re.compile(r"^## (\d{4}-\d{2}-\d{2} \d{2}:\d{2}) \| ([^|]+?) \| (STARTED|DONE|BLOCKED)\s*$")
 
 
@@ -63,7 +63,7 @@ def main() -> None:
     ap.add_argument("--fetch", action="store_true", help="git fetch --all first")
     if ap.parse_args().fetch:
         git("fetch", "--all", "--quiet")
-    rows = [(lane, latest(lane)) for lane in LANES + ("MERGE",)]
+    rows = [(lane, latest(lane)) for lane in LANES + ("MERGE", "DISPATCH")]
     print(f"{'LANE':5} {'UPDATED':17} {'CARD':8} {'STATUS':8} {'NEXT'}")
     for lane, e in rows:
         if e is None:

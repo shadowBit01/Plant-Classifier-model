@@ -23,7 +23,7 @@ if [ ! -d .git ]; then
   git init -q -b main && git add -A && git commit -qm "scaffold: contracts, stubs, tests, lane cards"
 fi
 git config core.hooksPath .githooks   # ownership check on every commit
-for b in lane/L1-data-eval lane/L2-encoders lane/L3-core-ml lane/L4-context lane/L5-app lane/L6-integration; do
+for b in lane/L1-data-eval lane/L2-encoders lane/L3-core-ml lane/L4-context lane/L5-app lane/L6-integration lane/L7-pitch; do
   git show-ref -q --verify "refs/heads/$b" || git branch "$b"
 done
 

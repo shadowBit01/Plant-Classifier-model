@@ -344,3 +344,8 @@ Append-only. One entry per dispatcher run. Format: AGENTS.md section 6.
 - Did: run 50: pulled main (clean); merged L2 (L2-f DONE, fixed DINO embeddings) via merge_lanes.py; dispatched L3-d (refit core on new embeddings) on Claude. L7-c still in flight.
 - Needs: none
 - Next: merge L3 when L3-d DONE, then L7-d refreshes numbers; merge L7 when L7-c DONE.
+
+## 2026-11-16 00:40 | DISPATCH | DONE
+- Did: run 51: pulled main (clean); merged L3 (L3-d refit) and L7 (L7-c report) via merge_lanes.py; dispatched L6-d (final table + live e2e on fixed embeddings) on Claude. Stashed post-merge regenerated pitch/report files (stash "autopilot").
+- Needs: HUMAN: review stash "autopilot" (pitch/report/VanaLens_report.html, figs/calibration.png, numbers.json regenerated after merge)
+- Next: merge L6 when L6-d DONE, then L7-d refreshes numbers/deck.

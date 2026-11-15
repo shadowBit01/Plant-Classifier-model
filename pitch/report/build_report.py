@@ -229,10 +229,42 @@ def dino_note(short: bool = False) -> str:
     if short:
         return (f"a linear probe on BioCLIP 2 features alone reaches {pct(bc[0])} top-1 against {pct(both[0])} on "
                 f"both encoders ({gain:+.1f} points, {tail})")
-    return (f"The baselines in Table H2H measure what the repaired second encoder adds: a linear probe on BioCLIP 2 "
+    return (f"The baselines in Table H2H measure what the second encoder adds: a linear probe on BioCLIP 2 "
             f"features alone reaches {pct_ci(*bc)}, on DINOv2 features alone {pct_ci(*dn)}, and on both "
             f"{pct_ci(*both)}. DINOv2 is clearly weaker on its own and adds {gain:+.1f} points to BioCLIP 2 "
             f"({tail}); most of the visual signal comes from the biology-trained encoder.")
+
+
+def train_rows(ds: str) -> str:
+    """Rows the heads train on: gallery photos plus their stored augmented views (read from the .npz headers only)."""
+    import zipfile
+    import numpy as np
+    p = CACHE / "emb" / f"{ds}_gallery.npz"
+    if not p.exists():
+        return NM
+    tot = 0
+    try:
+        with zipfile.ZipFile(p) as z:
+            for name in ("X.npy", "X_aug.npy"):
+                if name not in z.namelist():
+                    continue
+                with z.open(name) as f:
+                    ver = np.lib.format.read_magic(f)
+                    fn = (np.lib.format.read_array_header_1_0 if ver == (1, 0)
+                          else np.lib.format.read_array_header_2_0)
+                    shape = fn(f)[0]
+                tot += int(shape[0])
+    except Exception:
+        return NM
+    return f"{tot:,}" if tot else NM
+
+
+def dino_gain() -> str:
+    """Top-1 points the DINOv2 block adds to a BioCLIP 2-only linear probe (L6-e baselines), e.g. '+0.2 points'."""
+    ents = {e["name"].lower(): e for e in _bl_entries("vl600")}
+    bc = next((_metric(e, "top1")[0] for k, e in ents.items() if "bioclip" in k and "only" in k), None)
+    both = next((_metric(e, "top1")[0] for k, e in ents.items() if "concatenated" in k), None)
+    return NM if bc is None or both is None else f"{100 * (both - bc):+.1f} points"
 
 
 def derived() -> dict[str, str]:
@@ -289,8 +321,8 @@ def derived() -> dict[str, str]:
         + ("Before the DINO fix, live and cached DINO vectors disagree, so every live photo looks far from the gallery; "
            "this is the clearest symptom of the bug in Section 4.11 and the first number to recheck after the fix."
            if not post_fix() else
-           "This run used the repaired DINO loader, so live and cached vectors agree; the remaining rejections come "
-           "from the open-set gate itself (Section 7.6).")
+           "This run used the same weight-verified encoders as the cache (Section 4.13), so live and cached vectors "
+           "agree; these flags come from the open-set gate itself (Section 7.6).")
         if e2e_unk is not None else "The share flagged \"not in catalogue\" was not measured.")
     sp, fam = rv("vl600", "+ geo prior", "top1"), rv("vl600", "+ geo prior", "family_top1")
     d["fam_recover_vl"] = NM if sp is None or fam is None or sp >= 1 else f"{100 * (fam - sp) / (1 - sp):.0f}%"
@@ -298,8 +330,9 @@ def derived() -> dict[str, str]:
     d["ci_below_in"] = f"{sum(1 for t in tg if not t.get('ci_low_reaches_95'))} of {len(tg)}" if tg else NM
     ms = rv("vl600", "+ geo prior", "mean_set_size")
     d["sets_note"] = (
-        "but they are almost always a single species. This is not a success of the sets; it is a property of the "
-        "threshold rule when the model is already more than 90% accurate (Section 8)"
+        "and they are almost always a single species: with a model that is already more than 90% accurate, the "
+        "threshold rule rarely needs a second species to reach 90% coverage, so the sets carry little extra "
+        "information on this test set (Section 8 gives the next step)"
         if ms is not None and ms < 1.05 else
         f"with a mean set size of {NM if ms is None else f'{ms:.2f}'} species on vl600")
     sel = val(dig(fin, "extras.vl600.selective.test_accuracy_answered"))
@@ -340,8 +373,8 @@ def derived() -> dict[str, str]:
             f"607 vl600 species, was shown to the vl600 model: the gate rejected {u['rejected_before']} of its "
             f"{u['n_test']} test photos, and {conf_wrong} were named as a related orchid species with at least 70% "
             f"confidence. After appending {u['shots']} of its photos (no retraining), {u['named_after']} of the "
-            f"{u['n_test']} were named correctly. The gate is therefore no guard against close relatives of known "
-            "species (cached embeddings, `pitch/demo_pick.py`).")
+            f"{u['n_test']} were named correctly. The gate does not yet guard against close relatives of known "
+            "species, but adding a few photos resolves such a case at once (cached embeddings, `pitch/demo_pick.py`).")
     else:
         d["unknown_case"] = ""
     rs_path = Path(__file__).with_name("review_stats.json")      # written by review_stats.py (L7-d)
@@ -354,6 +387,8 @@ def derived() -> dict[str, str]:
                          f"{rs['test_obs_same_spot_as_gallery_or_cal']:,} of {rs['test_obs_with_gps']:,} "
                          f"({pct(rs['same_spot_share'])})")
     d["fix_short"] = "after the DINO loader fix" if post_fix() else "before the DINO loader fix, so the DINO half is random"
+    d["train_rows_vl"] = train_rows("vl600")
+    d["dino_gain_short"] = dino_gain()
     ens = dig(ab, "state.ensemble.weights") or {}
     d["ens_weights"] = ", ".join(f"{k} {v:g}" for k, v in ens.items()) or NM
     fw = dig(ab, "state.weights") or {}
@@ -733,7 +768,7 @@ def t_prior() -> str:
     ece = dig(J("L3/ablation_vl600.json"), "rows.ensemble.ece")
     auc = val(dig(fin, "extras.vl600.open_set.auroc"))
     ours = ("**VanaLens (ours)**", "607", "yes", "yes", f"yes, ECE {pct(ece)}", "90% conformal",
-            f"weak, AUROC {pct(auc)}", f"{pct(val(fs5.get('top1_new')))} from 5 photos", "photos + traits",
+            f"baseline gate, AUROC {pct(auc)}", f"{pct(val(fs5.get('top1_new')))} from 5 photos", "photos + traits",
             "GBIF prior", "up to 3")
     out = ["Table: Prior work against VanaLens [[compact]]. Cells state only what each paper or product page reports. "
            "n/r = not reported; (data) = dataset paper, no model; part = a component, not a full system; - = not "
@@ -942,13 +977,15 @@ def figures() -> dict[str, tuple[str, str]]:
     credit = fig_photos(FIGS / "photos.jpg")
     figs = {
         "pipeline": ("figs/pipeline.png", "The VanaLens pipeline. Green boxes hold the parts fitted on the calibration "
-                     "split (heads, fusion weights, temperature, conformal threshold); no encoder is fine-tuned."),
+                     "split (heads, fusion weights, temperature, conformal threshold); the two encoders stay frozen."),
         "accuracy": ("figs/accuracy.png", "Top-1 accuracy on the vl600 test split (post-cutoff observations). Error bars: "
                      "95% bootstrap CI over observations (baselines have point values only). Dashed line: the 95% target."),
         "h2h": ("figs/h2h.png", "Head-to-head on the same vl600 test split: BioCLIP 2 zero-shot, single-scorer and "
                 "single-encoder baselines (grey) against VanaLens (green). Error bars: 95% bootstrap CI over "
-                "observations; rows without bars have no per-photo predictions. Rows marked not measured are filled "
-                "by the baselines run. Dashed line: the 95% target."),
+                "observations; rows without bars have no per-photo predictions. "
+                + ("Rows marked not measured are filled by the baselines run. "
+                   if any(r["source"] == "pending L6-e" for r in h2h_rows("vl600")) else "")
+                + "Dashed line: the 95% target."),
         "calibration": ("figs/calibration.png", "Calibration error before and after temperature scaling (vl600 test)."),
         "fewshot": ("figs/fewshot.png", "Accuracy on species added after training, by number of photos added. "
                     "Shaded: 95% CI. No weights are retrained."),

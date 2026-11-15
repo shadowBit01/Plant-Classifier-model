@@ -254,3 +254,78 @@ Append-only. One entry per dispatcher run. Format: AGENTS.md section 6.
 - Did: run 32: pulled main (clean); merge_lanes.py merged L7 (L7-b), 0 failed; dispatched L2-f (Antigravity A / antigravity gemini-4-argon, Local full-access, Plant-Classifier-model). No blocked items.
 - Needs: none
 - Next: L2-f re-encodes DINO block; then L3-d (re-fit) and L6-d (final table) dispatch after merge.
+
+## 2026-11-15 20:10 | DISPATCH | DONE
+- Did: run 33: pulled main (clean); nothing to merge, dispatch or unblock; L2-f still in flight.
+- Needs: none
+- Next: merge L2 when L2-f DONE, then dispatch L3-d.
+
+## 2026-11-15 20:25 | DISPATCH | DONE
+- Did: run 34: pulled main (clean); nothing to merge, dispatch or unblock; L2-f still in flight.
+- Needs: none
+- Next: merge L2 when L2-f DONE, then dispatch L3-d.
+
+## 2026-11-15 20:40 | DISPATCH | DONE
+- Did: run 35: pulled main (clean); nothing to merge, dispatch or unblock; L2-f still in flight.
+- Needs: none
+- Next: merge L2 when L2-f DONE, then dispatch L3-d.
+
+## 2026-11-15 20:55 | DISPATCH | DONE
+- Did: run 36: pulled main (clean); nothing to merge, dispatch or unblock; L2-f still in flight.
+- Needs: none
+- Next: merge L2 when L2-f DONE, then dispatch L3-d.
+
+## 2026-11-15 21:10 | DISPATCH | DONE
+- Did: run 37: pulled main (clean); nothing to merge, dispatch or unblock; L2-f still in flight.
+- Needs: none
+- Next: merge L2 when L2-f DONE, then dispatch L3-d.
+
+## 2026-11-15 21:25 | DISPATCH | DONE
+- Did: run 38: pulled main (clean); nothing to merge, dispatch or unblock; L2-f still in flight.
+- Needs: none
+- Next: merge L2 when L2-f DONE, then dispatch L3-d.
+
+## 2026-11-15 21:40 | DISPATCH | DONE
+- Did: run 39: pulled main (clean); nothing to merge, dispatch or unblock; L2-f still in flight.
+- Needs: none
+- Next: merge L2 when L2-f DONE, then dispatch L3-d.
+
+## 2026-11-15 21:55 | DISPATCH | DONE
+- Did: run 40: pulled main (clean); nothing to merge, dispatch or unblock; L2-f still in flight.
+- Needs: none
+- Next: merge L2 when L2-f DONE, then dispatch L3-d.
+
+## 2026-11-15 22:10 | DISPATCH | DONE
+- Did: run 41: pulled main (clean); nothing to merge, dispatch or unblock; L2-f still in flight.
+- Needs: none
+- Next: merge L2 when L2-f DONE, then dispatch L3-d.
+
+## 2026-11-15 22:25 | DISPATCH | DONE
+- Did: run 42: pulled main (clean); nothing to merge, dispatch or unblock; L2-f still in flight.
+- Needs: none
+- Next: merge L2 when L2-f DONE, then dispatch L3-d.
+
+## 2026-11-15 22:40 | DISPATCH | DONE
+- Did: run 43: pulled main (clean); nothing to merge, dispatch or unblock; L2-f still in flight.
+- Needs: none
+- Next: merge L2 when L2-f DONE, then dispatch L3-d.
+
+## 2026-11-15 22:55 | DISPATCH | DONE
+- Did: run 44: pulled main (clean); nothing to merge, dispatch or unblock; L2-f still in flight.
+- Needs: none
+- Next: merge L2 when L2-f DONE, then dispatch L3-d.
+
+## 2026-11-15 23:10 | DISPATCH | DONE
+- Did: run 45: pulled main (clean); nothing to merge, dispatch or unblock; L2-f still in flight.
+- Needs: none
+- Next: merge L2 when L2-f DONE, then dispatch L3-d.
+
+## 2026-11-15 23:25 | DISPATCH | DONE
+- Did: run 46: pulled main (clean); nothing to merge, dispatch or unblock; L2-f still in flight.
+- Needs: none
+- Next: merge L2 when L2-f DONE, then dispatch L3-d.
+
+## 2026-11-15 23:40 | DISPATCH | DONE
+- Did: run 47: pulled main (clean); nothing to merge, dispatch or unblock; L2-f still in flight.
+- Needs: none
+- Next: merge L2 when L2-f DONE, then dispatch L3-d.

@@ -81,3 +81,11 @@ Append-only. One entry per dispatcher run. Format: AGENTS.md section 6.
 - Results: 2 merged, 2 dispatched, 0 blocked
 - Needs: none
 - Next: L1-d builds vl600 (long download); L5-c extends app; merge when DONE and dispatch what vl600 unblocks.
+
+## 2026-11-15 14:52 | DISPATCH | DONE
+- Did: pulled main (clean); merge_lanes.py merged L5 (L5-c), 0 failed; nothing to dispatch; L1-d still in flight. No blocked items.
+- Files: worklog/DISPATCH.md
+- Tests: lane gate tests run by merge_lanes.py (passed)
+- Results: 1 merged, 0 dispatched, 0 blocked
+- Needs: none
+- Next: merge L1-d (vl600) when DONE and dispatch the cards it unblocks (L2-e, L3-c, L6-c).

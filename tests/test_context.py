@@ -61,3 +61,53 @@ def test_prompt_and_parse(taxa):
     assert parse_choice("ANSWER: Beta one\nchanged mind\nANSWER: Alpha one", cands) == 0
     assert parse_choice("I think it is Gamma one", cands) is None
     assert parse_choice("ANSWER: Gamma one", cands) is None
+
+
+def test_gbif_species_counts_cache(tmp_path):
+    from vanalens.geo import gbif_species_counts
+    cache_file = tmp_path / "23.0_80.0_50_6.json"
+    cache_file.write_text('{"123": 45, "678": 90}')
+    counts = gbif_species_counts(23.18, 79.99, radius_km=50, kingdom_key=6, cache_dir=tmp_path)
+    assert counts == {123: 45, 678: 90}
+
+
+def test_resolve_gbif_keys_cache(tmp_path, taxa):
+    from vanalens.geo import resolve_gbif_keys
+    cache_file = tmp_path / "species_keys.json"
+    cache_file.write_text('{"Alpha one": 99999}')
+    resolve_gbif_keys(taxa[:1], cache_dir=tmp_path)
+    assert taxa[0].gbif_key == 99999
+
+
+def test_generate_traits_fallback(tmp_path, taxa):
+    from vanalens.traits import generate_traits
+    cache_path = tmp_path / "traits.json"
+    traits = generate_traits(taxa[:2], cache_path=cache_path)
+    assert len(traits) == 2
+    assert all(len(v) == 6 for v in traits.values())
+    assert cache_path.exists()
+
+
+def test_rerank_disabled_no_key(taxa):
+    from vanalens.rerank import rerank
+    cands = taxa[:3]
+    chosen, rationale, reranked = rerank([], cands, {}, {})
+    assert chosen == cands[0].idx
+    assert not reranked
+    assert "no key" in rationale
+
+
+def test_rerank_with_mock_client(taxa):
+    from unittest.mock import MagicMock
+    from vanalens.rerank import rerank
+
+    mock_msg = MagicMock()
+    mock_msg.content = [MagicMock(text="Looking at photo...\nANSWER: Alpha two")]
+    mock_client = MagicMock()
+    mock_client.messages.create.return_value = mock_msg
+
+    cands = taxa[:3]
+    chosen, rationale, reranked = rerank([], cands, {}, {}, client=mock_client)
+    assert chosen == 1
+    assert reranked
+

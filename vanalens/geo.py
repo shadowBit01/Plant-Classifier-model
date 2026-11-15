@@ -44,7 +44,10 @@ def gbif_species_counts(lat: float, lon: float, radius_km: int = 50, kingdom_key
         f"&kingdomKey={kingdom_key}&facet=speciesKey&facetLimit=10000&limit=0"
     )
     try:
-        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        req = urllib.request.Request(
+            url,
+            headers={"Accept": "application/json", "User-Agent": "VanaLens/1.0 (plant-classifier)"},
+        )
         with urllib.request.urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read())
         facets = data.get("facets", [])
@@ -87,7 +90,10 @@ def resolve_gbif_keys(taxa: list[Taxon], cache_dir: Path | None = None) -> list[
         params = urllib.parse.urlencode({"name": taxon.species, "kingdom": "Plantae"})
         url = f"https://api.gbif.org/v1/species/match?{params}"
         try:
-            req = urllib.request.Request(url, headers={"Accept": "application/json"})
+            req = urllib.request.Request(
+                url,
+                headers={"Accept": "application/json", "User-Agent": "VanaLens/1.0 (plant-classifier)"},
+            )
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = json.loads(resp.read())
             if data.get("matchType", "NONE") != "NONE":

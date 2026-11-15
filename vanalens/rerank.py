@@ -74,40 +74,56 @@ def rerank(query_paths: list[str], candidates: list[Taxon], ref_paths: dict[int,
 
     from .config import LLM_KEY_ENV
 
+    if not candidates:
+        return -1, "no candidates", False
+
+    fallback_idx = candidates[0].idx
+
     if client is None:
         api_key = os.environ.get(LLM_KEY_ENV)
+        if not api_key:
+            return fallback_idx, "reranker disabled: no key", False
         client = anthropic.Anthropic(api_key=api_key)
 
-    def _img_block(path: str) -> dict:
-        with open(path, "rb") as f:
-            data = base64.b64encode(f.read()).decode()
-        ext = path.rsplit(".", 1)[-1].lower()
-        media_type = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png"}.get(ext, "image/jpeg")
-        return {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": data}}
+    model = os.environ.get("VANALENS_LLM_MODEL") or "claude-3-5-sonnet-20241022"
+
+    def _img_block(path: str) -> dict | None:
+        try:
+            with open(path, "rb") as f:
+                data = base64.b64encode(f.read()).decode("ascii")
+            ext = path.rsplit(".", 1)[-1].lower() if "." in path else "jpeg"
+            media_types = {
+                "jpg": "image/jpeg",
+                "jpeg": "image/jpeg",
+                "png": "image/png",
+                "webp": "image/webp",
+                "gif": "image/gif",
+            }
+            media_type = media_types.get(ext, "image/jpeg")
+            return {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": data}}
+        except Exception:
+            return None
 
     prompt_text = build_rerank_prompt(candidates, traits)
 
     content: list = []
-    for qp in query_paths[:1]:  # up to 1 query image
-        try:
-            content.append(_img_block(qp))
-        except Exception:
-            pass
+    for qp in query_paths:
+        blk = _img_block(qp)
+        if blk:
+            content.append(blk)
 
     for taxon in candidates:
         refs = ref_paths.get(taxon.idx, [])[:2]
         for rp in refs:
-            try:
-                content.append(_img_block(rp))
-            except Exception:
-                pass
+            blk = _img_block(rp)
+            if blk:
+                content.append(blk)
 
     content.append({"type": "text", "text": prompt_text})
 
-    fallback_idx = candidates[0].idx
     try:
         msg = client.messages.create(
-            model="claude-opus-4-5",
+            model=model,
             max_tokens=512,
             messages=[{"role": "user", "content": content}],
         )
@@ -118,3 +134,4 @@ def rerank(query_paths: list[str], candidates: list[Taxon], ref_paths: dict[int,
         return chosen, rationale, True
     except Exception as e:
         return fallback_idx, str(e), False
+

@@ -217,6 +217,12 @@
    "deps": [
     "L7-b"
    ]
+  },
+  {
+   "id": "L7-d",
+   "deps": [
+    "L7-c"
+   ]
   }
  ],
  "project": "Plant-Classifier-model"

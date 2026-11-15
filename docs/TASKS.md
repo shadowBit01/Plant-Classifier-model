@@ -31,7 +31,7 @@ New tests go in new files you own; never edit someone else's test.
 | 3-6 | L1-b, then L2-b, L2-c (GPU), L1-c | inat_india manifests + embeddings cached; baseline JSONs in `runs/` |
 | 6-9 | Claude: L3-b then L6-a. Antigravity B: L4-b | **MVP: real pipeline answers an inat_india test photo** |
 | 9-16 | L6-b, L5-b | final table `runs/L6/final.json` |
-| wave 2 | L1-d (vl600), then L2-e + L4-c, L5-c; then L3-c, L6-c, L7-b, L7-c | runs/L6/final.json has vl600 with CIs; report + reviewed deck |
+| wave 2 | L1-d (vl600), then L2-e + L4-c, L5-c; then L3-c, L6-c, L7-b (deck), L7-c (report), L7-d (review) | runs/L6/final.json has vl600 with CIs; report + reviewed deck |
 | 16-19 | fixes only | feature freeze at 19 |
 | 19-24 | Claude: L7-a builds `pitch/VanaLens.pptx` from `runs/L6/final.json` | human rehearses |
 
@@ -398,25 +398,60 @@ When done, inside `.lanes/L7`: DONE entry in worklog/L7.md, commit with prefix [
 ```
 Lane L7, card L7-b. Setup, from the project root: `& $env:VANALENS_PY scripts/lane.py L7 --start L7-b` (bash: `"$VANALENS_PY" scripts/lane.py L7 --start L7-b`). It prepares your lane folder `.lanes/L7` (git worktree with the latest lane/L7-pitch and main merged in) and commits + pushes your STARTED entry. From then on work ONLY inside `.lanes/L7`: cd into it, read and edit only files under it, run python/pytest there with `$VANALENS_PY`. Never edit files outside `.lanes/L7` (AGENTS.md section 1).
 You are lane L7 (pitch). Read AGENTS.md, docs/HANDOFF.md, docs/RESEARCH.md, runs/L6/final.json and the JSON files in
-runs/. First update and rerun scripts/build_deck.py so pitch/VanaLens.pptx and its charts use the final results
-(vl600 headline, CIs, 1 vs 3 photos, selective accuracy, open-set, few-shot curve). Then write
-pitch/report/VanaLens_report.md in paper style: abstract, introduction, related work, method, datasets (inat_india;
-vl600 with species, photos, coverage %; campus if present), baselines, results with 95% CIs, ablations, open-set,
-few-shot, limitations, future work, references; figures from pitch/*.png. Render pitch/report/VanaLens_report.pdf
-with whatever is installed (pandoc, or a PDF library already in the venv); if nothing works, keep the .md and write
-`Needs: L6: add <package> to requirements.txt`. Use only numbers that exist in runs/. No em dashes anywhere.
+runs/. The current deck was judged weak by the human: REDESIGN pitch/VanaLens.pptx from scratch with
+scripts/build_deck.py (python-pptx), simple but clean.
+Theme: 16:9, white background, near-black text #1F2933, one accent green #2E7D32 plus light grey #E5E7EB for shapes,
+one font family (Segoe UI; titles 32-36 pt bold, body 18-22 pt), generous margins (0.6 in), left-aligned titles,
+small slide number bottom-right, no clip art, no gradients, no shadows, no word art. At most 4 bullets per slide and
+about 12 words per bullet; one message per slide stated in the title as a sentence. Charts from matplotlib in the same
+font and colours (accent for VanaLens, grey for baselines, no top/right spines, large labels, value labels on bars,
+CI error bars, 200 dpi PNG in pitch/). Use a few real vl600 photos (CC-licensed; small attribution line on the slide).
+Outline (11-13 slides): title; the problem (people want to name common plants, apps are overconfident); what we built
+(one line + 3 key ideas); how it works (simple pipeline diagram drawn with shapes: photo -> BioCLIP 2 + DINOv3
+embeddings -> probe / kNN / text scorers -> fusion + calibration -> location prior -> answer or "Not sure" set or
+"Not in catalog"); dataset vl600 (607 species, 61,367 photos, India + common cultivated + global, 71.6% coverage,
+test photos taken after the model's training cutoff); results vs baselines with 95% CIs; 1 photo vs 3 photos and
+selective accuracy; honest uncertainty (calibration / conformal sets); unknown plants + add a species with 5 photos
+(open-set and few-shot curve); app screenshots; limitations and next steps; thank you. Speaker notes on every slide.
+Verify visually: export every slide to PNG with PowerPoint COM automation (PowerShell, Office is installed; e.g.
+pitch/preview/slide_NN.png) and look at each image; fix any overflow, overlap, tiny text or empty areas, then
+re-export. Also write pitch/script.md (4-5 minute talk). Use only numbers that exist in runs/. No em dashes.
 When done, inside `.lanes/L7`: DONE entry in worklog/L7.md, commit with prefix [L7], `git push origin HEAD:lane/L7-pitch`, stop.
 ```
 
 **L7-c**
 ```
 Lane L7, card L7-c. Setup, from the project root: `& $env:VANALENS_PY scripts/lane.py L7 --start L7-c` (bash: `"$VANALENS_PY" scripts/lane.py L7 --start L7-c`). It prepares your lane folder `.lanes/L7` (git worktree with the latest lane/L7-pitch and main merged in) and commits + pushes your STARTED entry. From then on work ONLY inside `.lanes/L7`: cd into it, read and edit only files under it, run python/pytest there with `$VANALENS_PY`. Never edit files outside `.lanes/L7` (AGENTS.md section 1).
-You are lane L7 (pitch). Read AGENTS.md, pitch/report/VanaLens_report.md, pitch/VanaLens.pptx (via python-pptx) and
-runs/L6/final.json. Act as a skeptical reviewer: write pitch/report/review.md listing weaknesses (claims without
-numbers, missing CIs, training-data contamination, dataset and geographic bias, few test photos per species,
-baselines not run, unfair comparisons, overclaiming). Fix what the existing results in runs/ can fix (wording,
-missing numbers, CIs, figures); move everything else into the report's Limitations section. Rewrite pitch/demo.md to
-cover: a known plant; an unknown plant (rejected, then added with 5 photos and recognised); a 3-photo plant; a photo
-with GPS (show the geo prior effect); and a fallback if Wi-Fi fails. Rebuild the deck and PDF if changed. No em dashes.
+You are lane L7 (pitch). Read AGENTS.md, docs/HANDOFF.md, docs/RESEARCH.md, runs/L6/final.json, the JSON files in
+runs/, and the code docstrings you need (vanalens/*.py, eval/, scripts/) to describe the system accurately. Write the
+PROJECT REPORT for submission: pitch/report/VanaLens_report.md, built into pitch/report/VanaLens_report.pdf
+(10-16 pages) by pitch/report/build_report.py: markdown -> styled HTML (simple serif body, numbered headings,
+figure captions, tables) -> PDF with headless Edge (`msedge --headless --print-to-pdf=...`, installed) or Word COM.
+Required sections: 1 Introduction (problem, who it is for, goals); 2 How the system works (plain-language walkthrough
+of one prediction, with the pipeline figure); 3 Approach and methods (frozen encoders BioCLIP 2 + DINOv3, linear
+probe / MLP, kNN, text-trait prototypes, log-linear fusion, temperature scaling, split conformal sets, open-set reject,
+hierarchical backoff, GBIF location prior, multi-photo fusion, add-species without retraining, and why no
+fine-tuning); 4 Dataset (vl600 selection rules, splits by observation, post-cutoff test, licences, coverage; also
+inat_india; dataset link: iNaturalist + the open-data bucket + how to rebuild); 5 Experimental setup (metrics, CIs,
+baselines); 6 Results (tables with 95% CIs, ablation, 1 vs 3 photos, selective accuracy, calibration, open-set,
+few-shot, per-growth-form or hardest-species error analysis if the data allows); 7 Limitations of the current
+implementation (specific and honest); 8 How we plan to overcome them and improve (one concrete step per limitation,
+plus future features such as offline mobile app, more regional species, expert feedback loop); 9 Conclusion;
+References. Figures from pitch/*.png; add a confusion example figure if helpful. Use only numbers that exist in
+runs/; where a result is missing say "not measured". Write clearly and concretely. No em dashes.
+When done, inside `.lanes/L7`: DONE entry in worklog/L7.md, commit with prefix [L7], `git push origin HEAD:lane/L7-pitch`, stop.
+```
+
+**L7-d**
+```
+Lane L7, card L7-d. Setup, from the project root: `& $env:VANALENS_PY scripts/lane.py L7 --start L7-d` (bash: `"$VANALENS_PY" scripts/lane.py L7 --start L7-d`). It prepares your lane folder `.lanes/L7` (git worktree with the latest lane/L7-pitch and main merged in) and commits + pushes your STARTED entry. From then on work ONLY inside `.lanes/L7`: cd into it, read and edit only files under it, run python/pytest there with `$VANALENS_PY`. Never edit files outside `.lanes/L7` (AGENTS.md section 1).
+You are lane L7 (pitch). Read AGENTS.md, pitch/report/VanaLens_report.md, the slide PNGs in pitch/preview/ and
+runs/L6/final.json. Act as a skeptical reviewer of the report and the deck: write pitch/report/review.md listing
+weaknesses (claims without numbers, missing CIs, training-data contamination, dataset and geographic bias, few test
+photos per species, baselines not run, unfair comparisons, overclaiming, unclear explanations, slide design issues).
+Fix what the existing results in runs/ can fix (wording, missing numbers, CIs, figures, layout); move everything else
+into the report's Limitations section. Rewrite pitch/demo.md to cover: a known plant; an unknown plant (rejected,
+then added with 5 photos and recognised); a 3-photo plant; a photo with GPS (show the location prior effect); and a
+fallback if Wi-Fi fails. Rebuild the deck (re-export and re-check slide PNGs) and the PDF. No em dashes.
 When done, inside `.lanes/L7`: DONE entry in worklog/L7.md, commit with prefix [L7], `git push origin HEAD:lane/L7-pitch`, stop.
 ```

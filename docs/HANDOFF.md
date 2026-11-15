@@ -99,3 +99,7 @@ Never cut: baseline table, conformal sets, evidence panel, inat_india test split
   all chosen on cal; L6-c reports which metrics reach 95%. No species dropped, no tuning on test.
 - 2026-11-15 17:58 stale_minutes 120 -> 230 (240 breaks test_next_cards_stale_and_blocked): L2-e (61k images, flip TTA, ~12 img/s) is healthy at 1h45m and
   would be re-dispatched at 18:12, putting a second GPU job on the 6 GB card. Long vl600 jobs need more headroom.
+- 2026-11-15 18:30 Human: the deck was weak and a project report is required for submission. L7 split into
+  L7-b (deck redesign: clean white/green theme, 11-13 slides, slides exported to PNG via PowerPoint COM and checked),
+  L7-c (project report md -> PDF via headless Edge or Word: how it works, methods, dataset, results, limitations,
+  plan to overcome them), L7-d (skeptical review of both + demo.md). Report builder lives in pitch/report/ (L7-owned).

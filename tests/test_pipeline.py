@@ -308,3 +308,15 @@ def test_backoff_arrays_match_hierarchy(taxa):
         assert answered[i] == (rank != "unknown") and sp[i] == (rank == "species")
         truth = {"species": taxa[y[i]].species, "genus": taxa[y[i]].genus, "family": taxa[y[i]].family}
         assert correct[i] == (rank != "unknown" and label == truth[rank])
+
+
+def test_knn_dino_weight_from_state(taxa, clusters):
+    """L3-d stores the kNN DINO block weight in state["knn"]; the pipeline must build KNNScorer with it, since the
+    open-set threshold thr was fitted on cos_bioclip + w * cos_dino."""
+    st = dict(STATE, knn={"k": 10, "temperature": 0.05, "dino_weight": 0.25})
+    v = VanaLens(taxa, clusters["gallery"], st, text=None, encoder=FakeEncoder({}))
+    assert v.knn.dino_weight == 0.25
+    q = clusters["gallery"].X[:5]
+    sim = v.knn.max_similarity(q)
+    assert sim.max() <= 1.25 + 1e-4 and sim.max() > 1.0
+    assert VanaLens(taxa, clusters["gallery"], dict(STATE), text=None, encoder=FakeEncoder({})).knn.dino_weight == 1.0

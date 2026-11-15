@@ -99,7 +99,8 @@ class VanaLens:
         self.state = state
         self.n_fit = len(self.taxa)            # classes the probe knows
         kp = state.get("knn", {})
-        self.knn = KNNScorer(gallery, self.n_fit, k=kp.get("k", 10), temperature=kp.get("temperature", 0.05))
+        self.knn = KNNScorer(gallery, self.n_fit, k=kp.get("k", 10), temperature=kp.get("temperature", 0.05),
+                              dino_weight=float(kp.get("dino_weight", 1.0)))
         ens = state.get("ensemble") or {}
         self.config_name = "ensemble" if state.get("final") == "ensemble" and ens.get("kept", True) else "fused"
         cfg = ens if self.config_name == "ensemble" else state

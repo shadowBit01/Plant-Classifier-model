@@ -12,14 +12,429 @@ lookup (GBIF species/match, cached) or "" if unknown.
 """
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+import csv
 from dataclasses import asdict
+from io import BytesIO
 import json
 from pathlib import Path
+import re
+import time
+import urllib.parse
+import urllib.request
 
 import numpy as np
 from PIL import Image
 
-from .contracts import Sample, Taxon
+from .config import CACHE_DIR, DATA_DIR
+from .contracts import Sample, Taxon, load_taxa, save_taxa
+
+INAT_API = "https://api.inaturalist.org/v1"
+INAT_USER_AGENT = "VanaLens/1.0 (https://github.com/Plant-Classifier-model; research evaluation)"
+ALLOWED_LICENSES = {"cc0", "cc-by", "cc-by-nc"}
+_LAST_INAT_CALL = 0.0
+
+
+def _inat_get(endpoint: str, params: dict[str, object]) -> dict:
+    """Rate-limited GET against api.inaturalist.org (max 1 req/s), cached under CACHE_DIR/inat_api."""
+    global _LAST_INAT_CALL
+    import hashlib
+
+    query = urllib.parse.urlencode(sorted(params.items()))
+    url = f"{INAT_API}/{endpoint.lstrip('/')}?{query}"
+    cache_dir = CACHE_DIR / "inat_api"
+    cache_key = hashlib.sha256(url.encode("utf-8")).hexdigest()[:24]
+    cache_file = cache_dir / f"{cache_key}.json"
+    if cache_file.exists():
+        try:
+            return json.loads(cache_file.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    for attempt in range(4):
+        wait = 1.02 - (time.monotonic() - _LAST_INAT_CALL)
+        if wait > 0:
+            time.sleep(wait)
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": INAT_USER_AGENT, "Accept": "application/json"},
+        )
+        _LAST_INAT_CALL = time.monotonic()
+        try:
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            try:
+                cache_dir.mkdir(parents=True, exist_ok=True)
+                cache_file.write_text(json.dumps(data), encoding="utf-8")
+            except Exception:
+                pass
+            return data
+        except Exception:
+            if attempt == 3:
+                raise
+            time.sleep(2.0 * (attempt + 1))
+    return {}
+
+
+def _parse_obs_coords(obs: dict) -> tuple[float, float] | None:
+    geojson = obs.get("geojson")
+    if isinstance(geojson, dict):
+        coords = geojson.get("coordinates")
+        if isinstance(coords, (list, tuple)) and len(coords) >= 2:
+            try:
+                lon, lat = float(coords[0]), float(coords[1])
+                if np.isfinite(lat) and np.isfinite(lon):
+                    return lat, lon
+            except Exception:
+                pass
+    loc = obs.get("location")
+    if isinstance(loc, str) and "," in loc:
+        try:
+            lat_s, lon_s = loc.split(",", 1)
+            lat, lon = float(lat_s.strip()), float(lon_s.strip())
+            if np.isfinite(lat) and np.isfinite(lon):
+                return lat, lon
+        except Exception:
+            pass
+    return None
+
+
+def _medium_photo_from_obs(obs: dict) -> tuple[str, str] | None:
+    """Return (medium_url, license_code) for the first CC0/CC-BY/CC-BY-NC photo in `obs`."""
+    for p in obs.get("photos") or []:
+        if not isinstance(p, dict):
+            continue
+        lic = str(p.get("license_code") or "").strip().lower()
+        if lic not in ALLOWED_LICENSES:
+            continue
+        raw_url = str(p.get("url") or p.get("medium_url") or "").strip()
+        if not raw_url:
+            continue
+        med_url = re.sub(r"/(square|small|thumb)\.", "/medium.", raw_url)
+        return med_url, lic
+    return None
+
+
+def _fetch_species_obs(
+    place_id: int,
+    taxon_id: int,
+    *,
+    d1: str | None = None,
+    d2: str | None = None,
+    limit: int = 30,
+) -> list[dict[str, object]]:
+    params: dict[str, object] = {
+        "place_id": place_id,
+        "taxon_id": taxon_id,
+        "quality_grade": "research",
+        "geo": "true",
+        "photos": "true",
+        "photo_license": "cc0,cc-by,cc-by-nc",
+        "per_page": limit + 10,
+        "order_by": "id",
+        "order": "desc",
+    }
+    if d1 is not None:
+        params["d1"] = d1
+    if d2 is not None:
+        params["d2"] = d2
+
+    data = _inat_get("observations", params)
+    out: list[dict[str, object]] = []
+    seen_ids: set[str] = set()
+    for obs in data.get("results") or []:
+        if not isinstance(obs, dict) or "id" not in obs:
+            continue
+        obs_id = str(obs["id"])
+        if obs_id in seen_ids:
+            continue
+        observed_on = str(
+            obs.get("observed_on")
+            or (obs.get("observed_on_details") or {}).get("date")
+            or ""
+        ).strip()[:10]
+        if len(observed_on) != 10:
+            continue
+        if d2 is not None and not (observed_on < "2025-06-01"):
+            continue
+        if d1 is not None and not (observed_on >= "2025-07-01"):
+            continue
+        coords = _parse_obs_coords(obs)
+        if coords is None:
+            continue
+        photo_info = _medium_photo_from_obs(obs)
+        if photo_info is None:
+            continue
+        lat, lon = coords
+        med_url, lic = photo_info
+        seen_ids.add(obs_id)
+        out.append(
+            {
+                "obs_id": obs_id,
+                "observed_on": observed_on,
+                "lat": lat,
+                "lon": lon,
+                "license": lic,
+                "url": med_url,
+            }
+        )
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _download_photo(task: tuple[Path, str]) -> bool:
+    dest, url = task
+    if dest.exists() and dest.stat().st_size > 100:
+        return True
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": INAT_USER_AGENT})
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                raw = resp.read()
+            with Image.open(BytesIO(raw)) as im:
+                rgb = im.convert("RGB")
+                rgb.save(dest, format="JPEG", quality=92)
+            return True
+        except Exception:
+            if attempt == 2:
+                return False
+            time.sleep(1.0 * (attempt + 1))
+    return False
+
+
+def build_inat_india(root: Path = DATA_DIR / "inat_india") -> Path:
+    """Build $VANALENS_DATA/inat_india automatically from the iNaturalist API v1."""
+    root = Path(root)
+    root.mkdir(parents=True, exist_ok=True)
+
+    places = _inat_get("places/autocomplete", {"q": "Madhya Pradesh"}).get("results") or []
+    place_id = 7745
+    for p in places:
+        if isinstance(p, dict) and (
+            p.get("name") == "Madhya Pradesh"
+            or "Madhya Pradesh" in str(p.get("display_name") or "")
+        ):
+            place_id = int(p["id"])
+            break
+
+    sp_counts = _inat_get(
+        "observations/species_counts",
+        {
+            "place_id": place_id,
+            "taxon_id": 47126,
+            "quality_grade": "research",
+            "hrank": "species",
+            "lrank": "species",
+            "per_page": 60,
+        },
+    ).get("results") or []
+
+    species_records: list[tuple[str, list[dict[str, object]]]] = []
+    for entry in sp_counts[:60]:
+        taxon = entry.get("taxon") or {}
+        taxon_id = int(taxon["id"])
+        sp_name = str(taxon["name"]).strip()
+        if len(sp_name.split()) < 2:
+            continue
+        sp_name = " ".join(sp_name.split()[:2])
+
+        test_obs = _fetch_species_obs(place_id, taxon_id, d1="2025-07-01", limit=15)
+        if len(test_obs) < 5:
+            continue
+        pre_obs = _fetch_species_obs(place_id, taxon_id, d2="2025-05-31", limit=30)
+        seen: set[str] = set()
+        combined: list[dict[str, object]] = []
+        for rec in pre_obs + test_obs:
+            oid = str(rec["obs_id"])
+            if oid not in seen:
+                seen.add(oid)
+                combined.append(rec)
+        species_records.append((sp_name, combined))
+
+    download_tasks: list[tuple[Path, str]] = []
+    for sp_name, recs in species_records:
+        for rec in recs:
+            dest = root / sp_name / f"{rec['obs_id']}.jpg"
+            download_tasks.append((dest, str(rec["url"])))
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(_download_photo, download_tasks))
+
+    ok_paths = {task[0] for task, ok in zip(download_tasks, results) if ok}
+
+    meta_rows: list[dict[str, object]] = []
+    for sp_name, recs in sorted(species_records, key=lambda x: x[0]):
+        kept_recs = [
+            r for r in recs if (root / sp_name / f"{r['obs_id']}.jpg") in ok_paths
+        ]
+        n_test = sum(1 for r in kept_recs if str(r["observed_on"]) >= "2025-07-01")
+        if n_test < 5:
+            continue
+        for r in kept_recs:
+            meta_rows.append(
+                {
+                    "image": f"{sp_name}/{r['obs_id']}.jpg",
+                    "lat": r["lat"],
+                    "lon": r["lon"],
+                    "obs_id": r["obs_id"],
+                    "observed_on": r["observed_on"],
+                    "license": r["license"],
+                    "url": r["url"],
+                }
+            )
+
+    meta_path = root / "meta.csv"
+    with meta_path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=["image", "lat", "lon", "obs_id", "observed_on", "license", "url"],
+        )
+        writer.writeheader()
+        writer.writerows(meta_rows)
+
+    return root
+
+
+def _lookup_gbif_taxa_info(
+    species_names: list[str],
+    existing_labels: Path | None = None,
+    cache_dir: Path | None = None,
+) -> dict[str, tuple[str, int | None]]:
+    """Return {species: (family, gbif_key)} using cached GBIF species/match lookups."""
+    if cache_dir is None:
+        cache_dir = CACHE_DIR / "gbif"
+    cache_file = Path(cache_dir) / "species_match.json"
+    cache: dict[str, dict[str, object]] = {}
+    if cache_file.exists():
+        try:
+            cache = json.loads(cache_file.read_text(encoding="utf-8"))
+        except Exception:
+            cache = {}
+
+    if existing_labels is not None and existing_labels.exists():
+        try:
+            for t in load_taxa(existing_labels):
+                if t.species not in cache and (t.family or t.gbif_key is not None):
+                    cache[t.species] = {"family": t.family, "gbif_key": t.gbif_key}
+        except Exception:
+            pass
+
+    updated = False
+    out: dict[str, tuple[str, int | None]] = {}
+    for sp in species_names:
+        if sp in cache:
+            entry = cache[sp]
+            fam = str(entry.get("family") or "")
+            key = entry.get("gbif_key")
+            out[sp] = (fam, int(key) if key is not None else None)
+            continue
+
+        fam = ""
+        gbif_key: int | None = None
+        params = urllib.parse.urlencode({"name": sp, "kingdom": "Plantae"})
+        url = f"https://api.gbif.org/v1/species/match?{params}"
+        try:
+            req = urllib.request.Request(url, headers={"Accept": "application/json"})
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            if data.get("matchType", "NONE") != "NONE":
+                fam = str(data.get("family") or "")
+                raw_key = data.get("speciesKey") or data.get("usageKey")
+                gbif_key = int(raw_key) if raw_key is not None else None
+        except Exception:
+            pass
+        cache[sp] = {"family": fam, "gbif_key": gbif_key}
+        out[sp] = (fam, gbif_key)
+        updated = True
+
+    if updated:
+        try:
+            Path(cache_dir).mkdir(parents=True, exist_ok=True)
+            cache_file.write_text(json.dumps(cache, indent=1), encoding="utf-8")
+        except Exception:
+            pass
+
+    return out
+
+
+def load_inat_india(root: Path = DATA_DIR / "inat_india") -> tuple[list[Sample], list[Taxon]]:
+    """Load inat_india dataset from `root` (source="inat", group=obs_id, lat/lon filled)."""
+    root = Path(root)
+    meta_by_img: dict[str, dict[str, str]] = {}
+    meta_by_obs: dict[str, dict[str, str]] = {}
+    meta_path = root / "meta.csv"
+    if meta_path.exists():
+        with meta_path.open("r", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                img_rel = str(row.get("image") or "").replace("\\", "/").strip()
+                obs_id = str(row.get("obs_id") or "").strip()
+                if img_rel:
+                    meta_by_img[img_rel] = row
+                if obs_id:
+                    meta_by_obs[obs_id] = row
+
+    if meta_by_img:
+        species_set: set[str] = set()
+        for img_rel in meta_by_img:
+            if "/" in img_rel and (root / img_rel).exists():
+                species_set.add(img_rel.split("/", 1)[0])
+        species_names = sorted(species_set)
+    else:
+        species_names = sorted(
+            {p.parent.name for p in root.glob("*/*.jpg") if p.parent != root}
+        )
+
+    gbif_info = _lookup_gbif_taxa_info(species_names, existing_labels=root / "labels.json")
+    taxa = [
+        Taxon(
+            idx=i,
+            species=sp,
+            genus=sp.split()[0],
+            family=gbif_info[sp][0],
+            gbif_key=gbif_info[sp][1],
+        )
+        for i, sp in enumerate(species_names)
+    ]
+    save_taxa(taxa, root / "labels.json")
+
+    sp_to_idx = {t.species: t.idx for t in taxa}
+    samples: list[Sample] = []
+    for sp in species_names:
+        sp_dir = root / sp
+        if not sp_dir.is_dir():
+            continue
+        for img_path in sorted(sp_dir.glob("*.jpg"), key=lambda p: p.stem):
+            rel_img = f"{sp}/{img_path.name}"
+            if meta_by_img and rel_img not in meta_by_img:
+                continue
+            obs_id = img_path.stem
+            row = meta_by_img.get(rel_img) or meta_by_obs.get(obs_id) or {}
+            group = str(row.get("obs_id") or obs_id).strip()
+            lat: float | None = None
+            lon: float | None = None
+            try:
+                if row.get("lat") not in (None, ""):
+                    lat = float(row["lat"])
+                if row.get("lon") not in (None, ""):
+                    lon = float(row["lon"])
+            except Exception:
+                lat, lon = None, None
+            samples.append(
+                Sample(
+                    image_id=f"inat_india/{sp}/{group}",
+                    path=str(img_path.resolve()),
+                    label=sp_to_idx[sp],
+                    source="inat",
+                    group=group,
+                    organ=None,
+                    lat=lat,
+                    lon=lon,
+                )
+            )
+
+    return samples, taxa
 
 
 def load_dimpsar(root: Path, part: str = "leaf") -> tuple[list[Sample], list[Taxon]]:
@@ -65,7 +480,14 @@ def grouped_split(samples: list[Sample], fractions: tuple[float, float, float] =
         perm = rng.permutation(len(groups))
         shuffled = [groups[int(i)] for i in perm]
         m = len(shuffled)
-        if m >= 3:
+        if f_test == 0.0:
+            n_test = 0
+            if m >= 2 and f_cal > 0.0:
+                n_cal = min(m - 1, max(1, int(round(m * f_cal))))
+            else:
+                n_cal = 0
+            n_gal = m - n_cal
+        elif m >= 3:
             n_cal = max(1, int(round(m * f_cal)))
             n_test = max(1, int(round(m * f_test)))
             while n_cal + n_test >= m:

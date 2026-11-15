@@ -1,0 +1,607 @@
+{
+ "known": [
+  {
+   "image_id": "vl600/Acacia auriculiformis/328735276_595757899",
+   "path": "C:\\Users\\divya\\vanalens-data\\vl600\\Acacia auriculiformis\\328735276_595757899.jpg",
+   "species": "Acacia auriculiformis",
+   "lat": 12.8349534597,
+   "lon": 80.1957821557,
+   "india": true,
+   "license": "cc-by",
+   "conf": 1.0
+  },
+  {
+   "image_id": "vl600/Actiniopteris radiata/387456879_709503609",
+   "path": "C:\\Users\\divya\\vanalens-data\\vl600\\Actiniopteris radiata\\387456879_709503609.jpg",
+   "species": "Actiniopteris radiata",
+   "lat": 10.37230735,
+   "lon": 77.2637853,
+   "india": true,
+   "license": "cc-by",
+   "conf": 1.0
+  },
+  {
+   "image_id": "vl600/Actiniopteris radiata/387456879_709503631",
+   "path": "C:\\Users\\divya\\vanalens-data\\vl600\\Actiniopteris radiata\\387456879_709503631.jpg",
+   "species": "Actiniopteris radiata",
+   "lat": 10.37230735,
+   "lon": 77.2637853,
+   "india": true,
+   "license": "cc-by",
+   "conf": 1.0
+  },
+  {
+   "image_id": "vl600/Adiantum philippense/390594187_715606410",
+   "path": "C:\\Users\\divya\\vanalens-data\\vl600\\Adiantum philippense\\390594187_715606410.jpg",
+   "species": "Adiantum philippense",
+   "lat": 10.4075071955,
+   "lon": 76.2456703931,
+   "india": true,
+   "license": "cc-by",
+   "conf": 1.0
+  },
+  {
+   "image_id": "vl600/Barleria mysorensis/395229834_724659574",
+   "path": "C:\\Users\\divya\\vanalens-data\\vl600\\Barleria mysorensis\\395229834_724659574.jpg",
+   "species": "Barleria mysorensis",
+   "lat": 12.7294955,
+   "lon": 77.3166476,
+   "india": true,
+   "license": "cc-by",
+   "conf": 1.0
+  },
+  {
+   "image_id": "vl600/Basella alba/340742386_620140577",
+   "path": "C:\\Users\\divya\\vanalens-data\\vl600\\Basella alba\\340742386_620140577.jpg",
+   "species": "Basella alba",
+   "lat": 18.4885891583,
+   "lon": 73.8254315583,
+   "india": true,
+   "license": "cc-by",
+   "conf": 1.0
+  },
+  {
+   "image_id": "vl600/Breynia retusa/385257031_705291206",
+   "path": "C:\\Users\\divya\\vanalens-data\\vl600\\Breynia retusa\\385257031_705291206.jpg",
+   "species": "Breynia retusa",
+   "lat": 19.4729124201,
+   "lon": 72.862515673,
+   "india": true,
+   "license": "cc-by",
+   "conf": 1.0
+  },
+  {
+   "image_id": "vl600/Cosmos sulphureus/319311768_577192328",
+   "path": "C:\\Users\\divya\\vanalens-data\\vl600\\Cosmos sulphureus\\319311768_577192328.jpg",
+   "species": "Cosmos sulphureus",
+   "lat": 18.492884,
+   "lon": 73.7966859722,
+   "india": true,
+   "license": "cc-by",
+   "conf": 1.0
+  }
+ ],
+ "geo": [
+  {
+   "image_id": "vl600/Acalypha wilkesiana/405422718_744681867",
+   "path": "C:\\Users\\divya\\vanalens-data\\vl600\\Acalypha wilkesiana\\405422718_744681867.jpg",
+   "species": "Acalypha wilkesiana",
+   "lat": 18.5223,
+   "lon": 73.8390416667,
+   "india": true,
+   "license": "cc-by-nc",
+   "no_gps": "Mallotus philippensis",
+   "no_gps_conf": 0.28,
+   "gps_conf": 0.278
+  },
+  {
+   "image_id": "vl600/Albizia lebbeck/372869981_681391420",
+   "path": "C:\\Users\\divya\\vanalens-data\\vl600\\Albizia lebbeck\\372869981_681391420.jpg",
+   "species": "Albizia lebbeck",
+   "lat": 29.9125353631,
+   "lon": 73.8827712798,
+   "india": true,
+   "license": "cc-by-nc",
+   "no_gps": "Millingtonia hortensis",
+   "no_gps_conf": 0.529,
+   "gps_conf": 0.432
+  },
+  {
+   "image_id": "vl600/Anacardium occidentale/310455207_560316782",
+   "path": "C:\\Users\\divya\\vanalens-data\\vl600\\Anacardium occidentale\\310455207_560316782.jpg",
+   "species": "Anacardium occidentale",
+   "lat": 15.3232916667,
+   "lon": 74.1168971667,
+   "india": true,
+   "license": "cc-by-nc",
+   "no_gps": "Madhuca longifolia",
+   "no_gps_conf": 0.497,
+   "gps_conf": 0.451
+  },
+  {
+   "image_id": "vl600/Artocarpus heterophyllus/308094862_555808137",
+   "path": "C:\\Users\\divya\\vanalens-data\\vl600\\Artocarpus heterophyllus\\308094862_555808137.jpg",
+   "species": "Artocarpus heterophyllus",
+   "lat": 19.2372825136,
+   "lon": 72.9649006744,
+   "india": true,
+   "license": "cc-by-nc",
+   "no_gps": "Morinda citrifolia",
+   "no_gps_conf": 0.473,
+   "gps_conf": 0.582
+  },
+  {
+   "image_id": "vl600/Asclepias curassavica/313726738_566767704",
+   "path": "C:\\Users\\divya\\vanalens-data\\vl600\\Asclepias curassavica\\313726738_566767704.jpg",
+   "species": "Asclepias curassavica",
+   "lat": 10.2221246576,
+   "lon": 77.1868944168,
+   "india": true,
+   "license": "cc-by-nc",
+   "no_gps": "Lythrum salicaria",
+   "no_gps_conf": 0.232,
+   "gps_conf": 0.251
+  },
+  {
+   "image_id": "vl600/Azadirachta indica/296700879_534275682",
+   "path": "C:\\Users\\divya\\vanalens-data\\vl600\\Azadirachta indica\\296700879_534275682.jpg",
+   "species": "Azadirachta indica",
+   "lat": 11.4904033333,
+   "lon": 77.561115,
+   "india": true,
+   "license": "cc-by-nc",
+   "no_gps": "Robinia pseudoacacia",
+   "no_gps_conf": 0.621,
+   "gps_conf": 0.758
+  },
+  {
+   "image_id": "vl600/Barleria mysorensis/406046971_745942800",
+   "path": "C:\\Users\\divya\\vanalens-data\\vl600\\Barleria mysorensis\\406046971_745942800.jpg",
+   "species": "Barleria mysorensis",
+   "lat": 12.801825,
+   "lon": 78.298345,
+   "india": true,
+   "license": "cc-by-nc",
+   "no_gps": "Ziziphus nummularia",
+   "no_gps_conf": 0.681,
+   "gps_conf": 0.5
+  },
+  {
+   "image_id": "vl600/Bauhinia racemosa/393678561_721618011",
+   "path": "C:\\Users\\divya\\vanalens-data\\vl600\\Bauhinia racemosa\\393678561_721618011.jpg",
+   "species": "Bauhinia racemosa",
+   "lat": 18.5257038893,
+   "lon": 73.8238282688,
+   "india": true,
+   "license": "cc-by-nc",
+   "no_gps": "Cercis canadensis",
+   "no_gps_conf": 0.542,
+   "gps_conf": 0.649
+  }
+ ],
+ "multi": [
+  {
+   "group": "357865801",
+   "species": "Abutilon hirtum",
+   "paths": [
+    "C:\\Users\\divya\\vanalens-data\\vl600\\Abutilon hirtum\\357865801_652764645.jpg",
+    "C:\\Users\\divya\\vanalens-data\\vl600\\Abutilon hirtum\\357865801_652827064.jpg",
+    "C:\\Users\\divya\\vanalens-data\\vl600\\Abutilon hirtum\\357865801_652827065.jpg"
+   ],
+   "singles": [
+    [
+     "Abutilon hirtum",
+     0.996
+    ],
+    [
+     "Abutilon hirtum",
+     0.999
+    ],
+    [
+     "Abutilon indicum",
+     0.588
+    ]
+   ],
+   "three_conf": 0.982
+  },
+  {
+   "group": "323620980",
+   "species": "Aegle marmelos",
+   "paths": [
+    "C:\\Users\\divya\\vanalens-data\\vl600\\Aegle marmelos\\323620980_585603008.jpg",
+    "C:\\Users\\divya\\vanalens-data\\vl600\\Aegle marmelos\\323620980_585603027.jpg",
+    "C:\\Users\\divya\\vanalens-data\\vl600\\Aegle marmelos\\323620980_585603048.jpg"
+   ],
+   "singles": [
+    [
+     "Aegle marmelos",
+     0.996
+    ],
+    [
+     "Aegle marmelos",
+     0.932
+    ],
+    [
+     "Pithecellobium dulce",
+     0.272
+    ]
+   ],
+   "three_conf": 0.951
+  },
+  {
+   "group": "334864238",
+   "species": "Aegle marmelos",
+   "paths": [
+    "C:\\Users\\divya\\vanalens-data\\vl600\\Aegle marmelos\\334864238_608191250.jpg",
+    "C:\\Users\\divya\\vanalens-data\\vl600\\Aegle marmelos\\334864238_608191289.jpg",
+    "C:\\Users\\divya\\vanalens-data\\vl600\\Aegle marmelos\\334864238_608191326.jpg"
+   ],
+   "singles": [
+    [
+     "Aegle marmelos",
+     0.979
+    ],
+    [
+     "Wrightia tinctoria",
+     0.327
+    ],
+    [
+     "Aegle marmelos",
+     0.956
+    ]
+   ],
+   "three_conf": 0.923
+  },
+  {
+   "group": "409633470",
+   "species": "Ailanthus excelsa",
+   "paths": [
+    "C:\\Users\\divya\\vanalens-data\\vl600\\Ailanthus excelsa\\409633470_753223844.jpg",
+    "C:\\Users\\divya\\vanalens-data\\vl600\\Ailanthus excelsa\\409633470_753223887.jpg",
+    "C:\\Users\\divya\\vanalens-data\\vl600\\Ailanthus excelsa\\409633470_753223890.jpg"
+   ],
+   "singles": [
+    [
+     "Bombax ceiba",
+     0.654
+    ],
+    [
+     "Ailanthus excelsa",
+     0.872
+    ],
+    [
+     "Ailanthus excelsa",
+     0.339
+    ]
+   ],
+   "three_conf": 0.623
+  },
+  {
+   "group": "407779294",
+   "species": "Alangium salviifolium",
+   "paths": [
+    "C:\\Users\\divya\\vanalens-data\\vl600\\Alangium salviifolium\\407779294_749436929.jpg",
+    "C:\\Users\\divya\\vanalens-data\\vl600\\Alangium salviifolium\\407779294_749436932.jpg",
+    "C:\\Users\\divya\\vanalens-data\\vl600\\Alangium salviifolium\\407779294_749436935.jpg"
+   ],
+   "singles": [
+    [
+     "Alangium salviifolium",
+     0.571
+    ],
+    [
+     "Mangifera indica",
+     0.811
+    ],
+    [
+     "Alangium salviifolium",
+     0.627
+    ]
+   ],
+   "three_conf": 0.446
+  },
+  {
+   "group": "360088363",
+   "species": "Albizia lebbeck",
+   "paths": [
+    "C:\\Users\\divya\\vanalens-data\\vl600\\Albizia lebbeck\\360088363_657047474.jpg",
+    "C:\\Users\\divya\\vanalens-data\\vl600\\Albizia lebbeck\\360088363_657047538.jpg",
+    "C:\\Users\\divya\\vanalens-data\\vl600\\Albizia lebbeck\\360088363_657047649.jpg"
+   ],
+   "singles": [
+    [
+     "Albizia lebbeck",
+     0.422
+    ],
+    [
+     "Bambusa vulgaris",
+     0.907
+    ],
+    [
+     "Albizia lebbeck",
+     1.0
+    ]
+   ],
+   "three_conf": 0.891
+  },
+  {
+   "group": "372869981",
+   "species": "Albizia lebbeck",
+   "paths": [
+    "C:\\Users\\divya\\vanalens-data\\vl600\\Albizia lebbeck\\372869981_681391420.jpg",
+    "C:\\Users\\divya\\vanalens-data\\vl600\\Albizia lebbeck\\372869981_681392318.jpg",
+    "C:\\Users\\divya\\vanalens-data\\vl600\\Albizia lebbeck\\372869981_681392328.jpg"
+   ],
+   "singles": [
+    [
+     "Millingtonia hortensis",
+     0.529
+    ],
+    [
+     "Albizia lebbeck",
+     0.996
+    ],
+    [
+     "Millingtonia hortensis",
+     0.611
+    ]
+   ],
+   "three_conf": 0.833
+  },
+  {
+   "group": "319331022",
+   "species": "Alstonia scholaris",
+   "paths": [
+    "C:\\Users\\divya\\vanalens-data\\vl600\\Alstonia scholaris\\319331022_577228722.jpg",
+    "C:\\Users\\divya\\vanalens-data\\vl600\\Alstonia scholaris\\319331022_577228743.jpg",
+    "C:\\Users\\divya\\vanalens-data\\vl600\\Alstonia scholaris\\319331022_577228762.jpg"
+   ],
+   "singles": [
+    [
+     "Alstonia scholaris",
+     0.983
+    ],
+    [
+     "Delonix regia",
+     0.6
+    ],
+    [
+     "Mitragyna parvifolia",
+     0.226
+    ]
+   ],
+   "three_conf": 0.21
+  }
+ ],
+ "unknown": {
+  "species": "Vanda tessellata",
+  "thr": 0.967,
+  "shots": 5,
+  "add_paths": [
+   "C:\\Users\\divya\\vanalens-data\\inat_india\\Vanda tessellata\\194194825.jpg",
+   "C:\\Users\\divya\\vanalens-data\\inat_india\\Vanda tessellata\\33846405.jpg",
+   "C:\\Users\\divya\\vanalens-data\\inat_india\\Vanda tessellata\\126939195.jpg",
+   "C:\\Users\\divya\\vanalens-data\\inat_india\\Vanda tessellata\\134378757.jpg",
+   "C:\\Users\\divya\\vanalens-data\\inat_india\\Vanda tessellata\\224832509.jpg"
+  ],
+  "test": [
+   {
+    "path": "C:\\Users\\divya\\vanalens-data\\inat_india\\Vanda tessellata\\312860762.jpg",
+    "before": {
+     "unknown": false,
+     "sim": 0.979,
+     "rank": "species",
+     "label": "Aerides maculosa",
+     "conf": 0.993,
+     "top1": "Aerides maculosa"
+    },
+    "after": {
+     "unknown": false,
+     "sim": 1.095,
+     "rank": "species",
+     "label": "Vanda tessellata",
+     "conf": 1.0,
+     "top1": "Vanda tessellata"
+    }
+   },
+   {
+    "path": "C:\\Users\\divya\\vanalens-data\\inat_india\\Vanda tessellata\\334169029.jpg",
+    "before": {
+     "unknown": false,
+     "sim": 1.021,
+     "rank": "family",
+     "label": "Orchidaceae",
+     "conf": 0.999,
+     "top1": "Rhynchostylis retusa"
+    },
+    "after": {
+     "unknown": false,
+     "sim": 1.021,
+     "rank": "species",
+     "label": "Vanda tessellata",
+     "conf": 0.901,
+     "top1": "Vanda tessellata"
+    }
+   },
+   {
+    "path": "C:\\Users\\divya\\vanalens-data\\inat_india\\Vanda tessellata\\335881558.jpg",
+    "before": {
+     "unknown": false,
+     "sim": 1.061,
+     "rank": "species",
+     "label": "Aerides maculosa",
+     "conf": 0.995,
+     "top1": "Aerides maculosa"
+    },
+    "after": {
+     "unknown": false,
+     "sim": 1.114,
+     "rank": "species",
+     "label": "Vanda tessellata",
+     "conf": 1.0,
+     "top1": "Vanda tessellata"
+    }
+   },
+   {
+    "path": "C:\\Users\\divya\\vanalens-data\\inat_india\\Vanda tessellata\\336671084.jpg",
+    "before": {
+     "unknown": false,
+     "sim": 0.985,
+     "rank": "species",
+     "label": "Rhynchostylis retusa",
+     "conf": 0.967,
+     "top1": "Rhynchostylis retusa"
+    },
+    "after": {
+     "unknown": false,
+     "sim": 0.985,
+     "rank": "species",
+     "label": "Vanda tessellata",
+     "conf": 0.984,
+     "top1": "Vanda tessellata"
+    }
+   },
+   {
+    "path": "C:\\Users\\divya\\vanalens-data\\inat_india\\Vanda tessellata\\337545295.jpg",
+    "before": {
+     "unknown": false,
+     "sim": 1.043,
+     "rank": "species",
+     "label": "Rhynchostylis retusa",
+     "conf": 0.737,
+     "top1": "Rhynchostylis retusa"
+    },
+    "after": {
+     "unknown": false,
+     "sim": 1.043,
+     "rank": "species",
+     "label": "Vanda tessellata",
+     "conf": 0.983,
+     "top1": "Vanda tessellata"
+    }
+   },
+   {
+    "path": "C:\\Users\\divya\\vanalens-data\\inat_india\\Vanda tessellata\\339161830.jpg",
+    "before": {
+     "unknown": false,
+     "sim": 1.031,
+     "rank": "species",
+     "label": "Rhynchostylis retusa",
+     "conf": 0.717,
+     "top1": "Rhynchostylis retusa"
+    },
+    "after": {
+     "unknown": false,
+     "sim": 1.031,
+     "rank": "species",
+     "label": "Vanda tessellata",
+     "conf": 0.976,
+     "top1": "Vanda tessellata"
+    }
+   },
+   {
+    "path": "C:\\Users\\divya\\vanalens-data\\inat_india\\Vanda tessellata\\364006843.jpg",
+    "before": {
+     "unknown": false,
+     "sim": 1.028,
+     "rank": "species",
+     "label": "Aerides maculosa",
+     "conf": 0.983,
+     "top1": "Aerides maculosa"
+    },
+    "after": {
+     "unknown": false,
+     "sim": 1.058,
+     "rank": "species",
+     "label": "Vanda tessellata",
+     "conf": 1.0,
+     "top1": "Vanda tessellata"
+    }
+   },
+   {
+    "path": "C:\\Users\\divya\\vanalens-data\\inat_india\\Vanda tessellata\\372855408.jpg",
+    "before": {
+     "unknown": false,
+     "sim": 0.99,
+     "rank": "species",
+     "label": "Aerides maculosa",
+     "conf": 0.909,
+     "top1": "Aerides maculosa"
+    },
+    "after": {
+     "unknown": false,
+     "sim": 1.103,
+     "rank": "species",
+     "label": "Vanda tessellata",
+     "conf": 1.0,
+     "top1": "Vanda tessellata"
+    }
+   },
+   {
+    "path": "C:\\Users\\divya\\vanalens-data\\inat_india\\Vanda tessellata\\374292354.jpg",
+    "before": {
+     "unknown": false,
+     "sim": 1.011,
+     "rank": "species",
+     "label": "Aerides maculosa",
+     "conf": 0.993,
+     "top1": "Aerides maculosa"
+    },
+    "after": {
+     "unknown": false,
+     "sim": 1.137,
+     "rank": "species",
+     "label": "Vanda tessellata",
+     "conf": 1.0,
+     "top1": "Vanda tessellata"
+    }
+   },
+   {
+    "path": "C:\\Users\\divya\\vanalens-data\\inat_india\\Vanda tessellata\\377437363.jpg",
+    "before": {
+     "unknown": false,
+     "sim": 1.042,
+     "rank": "species",
+     "label": "Aerides maculosa",
+     "conf": 0.93,
+     "top1": "Aerides maculosa"
+    },
+    "after": {
+     "unknown": false,
+     "sim": 1.055,
+     "rank": "species",
+     "label": "Vanda tessellata",
+     "conf": 1.0,
+     "top1": "Vanda tessellata"
+    }
+   },
+   {
+    "path": "C:\\Users\\divya\\vanalens-data\\inat_india\\Vanda tessellata\\382700912.jpg",
+    "before": {
+     "unknown": false,
+     "sim": 1.03,
+     "rank": "species",
+     "label": "Aerides maculosa",
+     "conf": 0.994,
+     "top1": "Aerides maculosa"
+    },
+    "after": {
+     "unknown": false,
+     "sim": 1.098,
+     "rank": "species",
+     "label": "Vanda tessellata",
+     "conf": 1.0,
+     "top1": "Vanda tessellata"
+    }
+   }
+  ],
+  "rejected_before": 0,
+  "named_after": 11,
+  "n_test": 11
+ },
+ "counts": {
+  "known": 960,
+  "geo": 79,
+  "multi": 139
+ }
+}

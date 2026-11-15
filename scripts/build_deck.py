@@ -122,6 +122,13 @@ def collect() -> dict[str, Any]:
     d["h2h"] = br.h2h_rows("vl600")
     d["h2h_d"] = br.h2h_derived()
     d["prior"] = br.PRIOR
+    ents = {e["name"].lower(): e for e in br._bl_entries("vl600")}
+    bc = next((br._metric(e, "top1")[0] for k, e in ents.items() if "bioclip" in k and "only" in k), None)
+    both = next((br._metric(e, "top1")[0] for k, e in ents.items() if "concatenated" in k), None)
+    rs = OUT / "report" / "review_stats.json"
+    share = json.loads(rs.read_text(encoding="utf-8")).get("india_share_test_observations") if rs.exists() else None
+    d["india_test"] = "n/m" if share is None else pct(share, 0)
+    d["dino_gain"] = "n/m" if bc is None or both is None else f"{100 * (both - bc):+.1f} points"
     return d
 
 
@@ -142,25 +149,26 @@ def setup_mpl() -> None:
 
 def hbars(path: Path, labels: list[str], vals: list[float], cis: list[list[float] | None],
           ours: list[bool], size: tuple[float, float], xlabel: str, xmax: float = 100,
-          target: float | None = None, fmt: str = "{:.1f}%") -> None:
+          target: float | None = None, fmt: str = "{:.1f}%", xmin: float = 0) -> None:
     """Horizontal bar chart (top to bottom in list order), value labels, 95% CI error bars."""
     fig, ax = plt.subplots(figsize=size)
     y = list(range(len(labels)))[::-1]
     cols = [HEX_ACCENT if o else HEX_BASE for o in ours]
-    ax.barh(y, vals, color=cols, height=0.62, zorder=2)
+    ax.barh(y, [v - xmin for v in vals], left=xmin, color=cols, height=0.62, zorder=2)
     for yi, v, ci in zip(y, vals, cis):
         if ci:
             ax.errorbar(v, yi, xerr=[[v - ci[0]], [ci[1] - v]], fmt="none", ecolor=HEX_INK,
                         elinewidth=1.4, capsize=5, zorder=3)
         hi = ci[1] if ci else v
-        ax.text(hi + xmax * 0.012, yi, fmt.format(v), va="center", ha="left", fontsize=15,
-                fontweight="bold", color=HEX_INK)
+        ax.text(hi + (xmax - xmin) * 0.012, yi, fmt.format(v), va="center", ha="left", fontsize=15,
+                fontweight="bold", color=HEX_INK, zorder=4,
+                bbox=dict(facecolor="white", edgecolor="none", pad=1.5))
     if target is not None:
         ax.axvline(target, color=HEX_INK, lw=1.2, ls="--", zorder=1)
         ax.text(target, len(labels) - 0.45, f"{target:.0f}% target", ha="center", va="bottom",
                 fontsize=13, color=HEX_MUTED)
     ax.set_yticks(y, labels)
-    ax.set_xlim(0, xmax * 1.1)
+    ax.set_xlim(xmin, xmin + (xmax - xmin) * 1.1)
     ax.set_xlabel(xlabel)
     ax.tick_params(axis="y", length=0)
     ax.spines["left"].set_visible(False)
@@ -174,7 +182,7 @@ def chart_results(d: dict) -> Path:
     p = OUT / "results.png"
     hbars(p,
           ["BioCLIP 2 zero-shot,\nopen-ended", "BioCLIP 2 zero-shot,\n607 names given",
-           "Linear probe on\nour embeddings", "VanaLens, 1 photo", "VanaLens, up to 3 photos"],
+           "Linear probe on\nour embeddings", "VanaLens, 1 photo\n+ location", "VanaLens, up to 3\nphotos + location"],
           [100 * d["b2"]["open_ended_top1"], 100 * d["b2"]["top1"], 100 * d["probe"]["top1"],
            100 * d["one"]["top1"], 100 * d["three"]["top1"]],
           [None, None, [100 * c for c in d["probe"]["ci"]["top1"]],
@@ -230,7 +238,8 @@ def chart_photos(d: dict) -> Path:
           [100 * d["one_nogeo"]["top1"], 100 * d["one"]["top1"], 100 * d["three"]["top1"]],
           [[100 * c for c in d["one_nogeo"]["ci"]["top1"]], [100 * c for c in d["one"]["ci"]["top1"]],
            [100 * c for c in d["three"]["ci"]["top1"]]],
-          [False, True, True], (7.6, 4.4), "Top-1 accuracy on vl600 test (%)", target=95)
+          [False, True, True], (7.6, 4.4), "Top-1 accuracy on vl600 test (%), axis starts at 85", target=95,
+          xmin=85)
     return p
 
 
@@ -242,7 +251,8 @@ def chart_calibration(d: dict) -> Path:
               "Fused + temperature", "VanaLens ensemble"],
           [100 * e["probe"], 100 * e["fused"], 100 * d["ece_b2"], 100 * e["fused+T"], 100 * e["ensemble"]],
           [None] * 5, [False, False, False, True, True], (7.4, 4.2),
-          "Calibration error (ECE, %), lower is better", xmax=16)
+          "Calibration error (ECE, %), lower is better",
+          xmax=max(2.0, 1.3 * 100 * max(e["probe"], e["fused"], d["ece_b2"], e["fused+T"], e["ensemble"])))
     return p
 
 
@@ -523,7 +533,7 @@ def build() -> None:
     text(s, M, Inches(3.05), Inches(5.6), Inches(1.4), "Plant identification that knows\nwhen it is not sure",
          28, False, INK)
     text(s, M, Inches(4.55), Inches(5.6), Inches(0.9),
-         f"{st['species']} common plants of India and the world.\nEvery number measured on unseen photos.", 18, False, MUTED)
+         f"{st['species']} common plants of India and the world.\nTested on photos taken after the models were trained.", 18, False, MUTED)
     gx, gy, gw, gap = Inches(6.75), Inches(0.6), Inches(2.85), Inches(0.14)
     for i, k in enumerate(["calotropis", "delonix", "hibiscus", "lantana"]):
         px = gx + (i % 2) * (gw + gap)
@@ -531,15 +541,16 @@ def build() -> None:
         picture(s, crop_photo(k, 1.0), px, py, gw, gw)
 
     # 2. problem
-    s = deck.slide("People want plant names; apps give false confidence.", (
+    s = deck.slide("Apps name plants but rarely say how sure they are.", (
         "Everyone walks past plants they cannot name: a tree on the street, a herb in a market, a weed in a field. "
-        "Plant apps exist, but they give one confident answer, even for a plant they have never seen. "
+        "Plant apps exist, but they give a ranked list of names, and none we found publishes a coverage guarantee or "
+        "a 'not in our list' answer. "
         "General AI chatbots are worse at naming plants from an open question. "
         "And if your local plant is missing, you cannot add it without retraining the model."),
         foot=credit(meta, ["tulsi", "mango"]))
     bullets(s, M, top + Inches(0.2), Inches(8.0), Inches(4.5), [
         "Common plants matter daily: food, medicine, gardens, weeds.",
-        "Apps return one confident name, even for unknown plants.",
+        "Apps give a ranked list; none we found says \"not in our list\".",
         f"Open-ended, BioCLIP 2 names only {pct(d['b2']['open_ended_top1'], 0)} of our test photos.",
         "Adding a missing local species usually means retraining.",
     ], size=22, gap=20)
@@ -557,13 +568,14 @@ def build() -> None:
     for r in d["prior"]:
         if r[0].startswith(keep):
             body.append([re.sub(r"\s*\[R[^\]]*\]", "", r[0])] + [r[c] for c in cols])
-    body.append(["VanaLens (ours)", str(st["species"]), "yes", "90% sets", "yes (weak)",
+    body.append(["VanaLens (ours)", str(st["species"]), "yes", "90% (size 1)", "yes (weak)",
                  f"5 photos: {pct(fs5['top1_new']['value'], 0)}", "photos + traits", "GBIF", "up to 3"])
-    s = deck.slide("Prior plant ID gives one answer and cannot learn new plants.", (
+    s = deck.slide("Prior plant ID: no sets, no unknowns, retrain to add.", (
         "Plant ID is not new. Leafsnap matched leaf outlines; Indian work trains CNNs on a few dozen clean leaf "
         "photos and must retrain for every new species; Pl@ntNet, Lens and Seek are closed and give a ranked answer. "
         "BioCLIP 2 and DINOv2, which we build on, are encoders, not full systems. Each cell says only what the paper "
-        "reports. The last row is the point: VanaLens has all of these in one system."),
+        "reports. The last row is the point: VanaLens has all of these in one system, though its unknown check is "
+        "weak and its sets are nearly always one species on our data."),
         foot="n/r = not reported in the paper or product page. Sources and the full table: report, Section 2.")
     table(s, M, top + Inches(0.05), CW, [head] + body, [2.6, 1.15, 0.95, 1.1, 1.2, 1.35, 1.25, 0.95, 1.05],
           size=13, row_h=0.5)
@@ -572,15 +584,15 @@ def build() -> None:
     s = deck.slide(f"VanaLens names {st['species']} plants and says when it is unsure.", (
         "VanaLens is a plant identifier built on two frozen vision models, so there is no fine-tuning. "
         "Three ideas make it different. First, no retraining: a new species is added by dropping in a few photos. "
-        "Second, honest uncertainty: confidence is calibrated, and when it is not sure it returns a short list or "
-        "says the plant is not in its catalog. Third, it uses context: more photos of the same plant and the "
+        "Second, honest uncertainty: confidence is calibrated, and when it is not sure it answers at genus or family "
+        "level or says the plant may not be in its catalog. Third, it uses context: more photos of the same plant and the "
         "location where the photo was taken."))
     text(s, M, top + Inches(0.05), CW, Inches(0.6),
-         "Upload 1 to 3 photos. Get a species, a short list, or \"not in catalog\", with evidence.", 22, False, INK)
+         "Upload 1 to 3 photos. Get a species, a genus or family when unsure, or \"not in catalog\".", 22, False, INK)
     cw3, gap3, cy, ch = Inches(3.85), Inches(0.29), top + Inches(1.2), Inches(3.0)
     ideas = [
         ("1", "No retraining", "Frozen BioCLIP 2 and DINOv2 encoders. Add a species with a few photos."),
-        ("2", "Honest uncertainty", f"Calibrated confidence, {pct(1 - alpha, 0)} prediction sets, and a \"not in catalog\" answer."),
+        ("2", "Honest uncertainty", f"Calibrated confidence, genus or family backoff, and a \"not in catalog\" flag."),
         ("3", "Uses context", "Fuses up to 3 photos and a location prior from GBIF records."),
     ]
     for i, (num, head, body) in enumerate(ideas):
@@ -596,7 +608,7 @@ def build() -> None:
         "and DINOv2, a general visual model. Scorers read those embeddings: a linear probe, a nearest-neighbour "
         "search over reference photos that also gives us evidence pictures, and text prototypes built from written "
         "plant traits. We fuse them and calibrate with temperature scaling, then multiply in a location prior. "
-        "Finally a conformal rule decides: one species, a short 'not sure' list, or 'not in catalog'."))
+        "Finally it decides: one species, a genus or family when no species is clear, or 'not in catalog'."))
     by, bh, bw = top + Inches(0.75), Inches(1.75), Inches(1.6)
     gapx = Inches(0.32)
     steps = [
@@ -616,7 +628,7 @@ def build() -> None:
     ow = SW - M - ox
     oh, og = Inches(1.05), Inches(0.22)
     oy0 = by + bh / 2 - (3 * oh + 2 * og) / 2
-    outs = [("Answer", "one species", True), ("Not sure", "short list, 90% set", False),
+    outs = [("Answer", "one species", True), ("Not sure", "genus or family", False),
             ("Not in catalog", "add it with photos", False)]
     last_x = M + 4 * (bw + gapx) + bw
     for i, (head, sub, acc) in enumerate(outs):
@@ -630,7 +642,7 @@ def build() -> None:
 
     # 4b. what is new
     hd = d["h2h_d"]
-    s = deck.slide("What is new: the system and the evidence, not a new network.", (
+    s = deck.slide("New: the system and its evidence, not a network.", (
         "We did not invent a new network, and we cite every part we reuse. What is new is the system and the "
         "evidence. One: fused, calibrated scorers with sets, genus backoff, an unknown check, location and several "
         "photos, all on frozen models. Two: a new species from five photos, no retraining, "
@@ -645,7 +657,8 @@ def build() -> None:
         "species it never saw.",
         "Evidence with every answer: nearest reference photos and the plant traits that matched.",
         f"Measured on {st['species']} Indian and common species, photos from after July 2025: "
-        f"{hd['h2h_gain_zs']} over BioCLIP 2 zero-shot on the same photos ({hd['h2h_gain_zs3']} with 3 photos).",
+        f"{hd['h2h_gain_zs']} over BioCLIP 2 zero-shot on the same photos; only {hd['h2h_gain_best']} over a "
+        "linear probe on the same features (intervals overlap).",
     ], size=21, gap=22)
 
     # 5. dataset
@@ -668,7 +681,7 @@ def build() -> None:
     bullets(s, M, top + Inches(3.55), Inches(6.0), Inches(1.6), [
         f"{st['species_by_source']['india']} top India + {st['species_by_source']['world']} top world + "
         f"{st['species_by_source']['common']} common cultivated.",
-        "Chosen by observation count only; no species dropped.",
+        f"Chosen by observation count only; {d['india_test']} of test from India.",
     ], size=18, gap=8)
     pw = Inches(1.82)
     for i, k in enumerate(["mango", "lotus", "tulsi"]):
@@ -677,10 +690,10 @@ def build() -> None:
          "Mango, lotus, tulsi: three of the 607 classes.", 16, False, MUTED)
 
     # 6. results
-    s = deck.slide(f"VanaLens beats BioCLIP 2 on {one['n']:,} unseen photos.", (
+    s = deck.slide(f"Ahead of BioCLIP 2 zero-shot on {one['n']:,} new photos.", (
         f"On {one['n']:,} test photos, BioCLIP 2 zero-shot gets {pct(d['b2']['top1'])} when we give it our 607 names, and "
         f"{pct(d['b2']['open_ended_top1'])} open-ended. A linear probe on our embeddings gets {pct(probe['top1'])}. VanaLens with one "
-        f"photo gets {pct(one['top1'])}, and with up to three photos of the same plant {pct(three['top1'])}. Error bars are 95% "
+        f"photo and its location gets {pct(one['top1'])}, and with up to three photos of the same plant {pct(three['top1'])}. Error bars are 95% "
         "bootstrap intervals; the BioCLIP 2 runs have no per-photo file, so no interval. We could not run the Pl@ntNet "
         f"API or a VLM baseline because we had no API keys. On our second test set, inat_india, the picture is the same: "
         f"{pct(d['in_one']['top1'])} versus {pct(d['in_b2']['top1'])}."),
@@ -688,7 +701,7 @@ def build() -> None:
              "Pl@ntNet API and VLM baselines not run (no API keys).")
     picture(s, cpath["results"], M - Inches(0.1), top, Inches(8.0))
     bullets(s, Inches(8.45), top + Inches(0.35), Inches(4.3), Inches(4.5), [
-        f"+{100 * (one['top1'] - d['b2']['top1']):.1f} points over BioCLIP 2 given the same 607 names.",
+        f"+{100 * (one['top1'] - d['b2']['top1']):.1f} points over BioCLIP 2 given the same 607 names (1 photo + location).",
         f"Top-5: {pct(one['top5'])} with 1 photo, {pct(three['top5'])} with 3.",
         f"Second test set (inat_india): {pct(d['in_one']['top1'])} vs {pct(d['in_b2']['top1'])}.",
     ], size=18, gap=16)
@@ -696,7 +709,7 @@ def build() -> None:
     # 6b. head-to-head
     hd = d["h2h_d"]
     pend = [r for r in d["h2h"] if r["source"] == "pending L6-e"]
-    s = deck.slide("Same photos: far ahead of BioCLIP 2, slightly ahead of a strong probe.", (
+    s = deck.slide("Same photos: far ahead of zero-shot, level with a probe.", (
         f"Every bar uses the same {one['n']:,} test photos and the same frozen features, nothing tuned on test. "
         f"Against BioCLIP 2 zero-shot with our 607 names we are {hd['h2h_gain_zs']} ahead. Against the best baseline, a "
         f"linear probe on both encoders, one photo gives only {hd['h2h_gain_best']} and the intervals overlap, so we do "
@@ -708,7 +721,7 @@ def build() -> None:
     picture(s, cpath["h2h"], M - Inches(0.1), top - Inches(0.05), Inches(8.0))
     bullets(s, Inches(8.45), top + Inches(0.3), Inches(4.3), Inches(4.6), [
         f"{hd['h2h_gain_zs']} over BioCLIP 2 zero-shot, same 607 names, 1 photo.",
-        f"{hd['h2h_gain_best']} over the best baseline (1 photo); {hd['h2h_gain_best3']} with 3 photos + location.",
+        f"{hd['h2h_gain_best']} over the best baseline (1 photo), intervals overlap; {hd['h2h_gain_best3']} with 3 photos + location.",
         "Only VanaLens gives sets, genus backoff, unknown check, add-a-species and evidence.",
     ], size=18, gap=16)
 
@@ -716,8 +729,8 @@ def build() -> None:
     s = deck.slide("Up to three photos push top-1 accuracy past 95%.", (
         f"One photo gives {pct(d['one_nogeo']['top1'])}. Adding the location prior lifts it to {pct(one['top1'])}. Letting the "
         f"user add up to three photos of the same plant lifts it to {pct(three['top1'])}, with the whole confidence interval "
-        f"above 95%. We also tried letting the model abstain when unsure: on vl600 it answers {pct(sel['test_share_answered']['value'], 2)} "
-        f"of photos at {pct(sel['test_accuracy_answered']['value'])}, so abstaining barely changes anything here. "
+        f"above 95%. One photo alone stays just short of the 95% target. We also tried letting the model abstain when unsure, "
+        f"but the threshold chosen on calibration answers {pct(sel['test_share_answered']['value'], 0)} of test photos, so it does nothing here. "
         f"The safer fallback is the taxonomy: if it backs off to genus or family when unsure, it is right {pct(tgt['backoff accuracy at reported rank (1 photo)']['value'])} of the time."),
         foot=f"Up to 3 photos: scored per observation ({three['n']:,} observations). 1 photo: {one['n']:,} photos. "
              "Error bars: 95% bootstrap CI.")
@@ -725,14 +738,14 @@ def build() -> None:
     bullets(s, Inches(8.25), top + Inches(0.3), Inches(4.5), Inches(4.5), [
         f"Up to 3 photos: {pct(three['top1'])}, CI {pct(three['ci']['top1'][0])} to {pct(three['ci']['top1'][1])}.",
         f"Backing off to genus or family when unsure: {pct(tgt['backoff accuracy at reported rank (1 photo)']['value'])} correct.",
-        f"Abstaining adds little: {pct(sel['test_accuracy_answered']['value'])} on {pct(sel['test_share_answered']['value'], 2)} answered.",
+        f"1 photo: {pct(one['top1'])}, just short of 95%. Abstaining did nothing ({pct(sel['test_share_answered']['value'], 0)} answered).",
     ], size=18, gap=16)
 
     # 8. honest uncertainty
     s = deck.slide("Calibrated confidence matches how often it is right.", (
-        f"Raw fused scores are overconfident: calibration error is {pct(d['ece']['fused'])}. One temperature parameter, fitted "
-        f"on the calibration split, brings it to {pct(d['ece']['fused+T'])}; the final ensemble sits at {pct(d['ece']['ensemble'])}. "
-        f"So when VanaLens says 90%, it is right about 90% of the time. On top we use split conformal prediction with a "
+        f"Calibration error is low for every model here: {pct(d['ece']['probe'])} for the linear probe, {pct(d['ece']['fused'])} for the "
+        f"fused scores before temperature and {pct(d['ece']['fused+T'])} after, {pct(d['ece']['ensemble'])} for the final ensemble. So when "
+        f"VanaLens says 90%, it is right about 90% of the time, but calibration is not what sets it apart. On top we use split conformal prediction with a "
         f"{pct(1 - alpha, 0)} target: the true species was in the set {pct(ens['coverage'])} of the time. Because top-1 is already above "
         "90%, the set is almost always a single species, so the short 'not sure' list rarely appears on this data."),
         foot="ECE: expected calibration error on the vl600 test split. Temperature and conformal threshold fitted on the calibration split.")
@@ -742,7 +755,7 @@ def build() -> None:
     tile(s, Inches(8.3), top + Inches(1.75), Inches(4.43), Inches(1.4), f"{ens['mean_set_size']:.1f}",
          "species per set on average")
     text(s, Inches(8.3), top + Inches(3.4), Inches(4.43), Inches(1.4),
-         "Guarantee holds, but sets are rarely larger than one species on vl600.", 18, False, INK)
+         "Sets are always one species: coverage holds only because top-1 is above 90%.", 18, False, INK)
 
     # 9. open set + few-shot
     s = deck.slide("Add a new species with 5 photos and no retraining.", (
@@ -774,8 +787,8 @@ def build() -> None:
     picture(s, APP / "identify.png", M, top + Inches(0.2), Inches(4.9), border=True)
     picture(s, APP / "result.png", Inches(5.75), top + Inches(0.2), Inches(6.98))
     text(s, M, top + Inches(4.0), CW, Inches(0.9),
-         "Every answer shows a calibrated confidence, the 90% set, matched traits and the nearest gallery photos.\n"
-         "A second tab adds a new species from a few photos.", 18, False, INK)
+         "Every answer shows a calibrated confidence, the 90% set, matched traits and the nearest gallery photos\n"
+         "(listed by file in this build). A second tab adds a new species from a few photos.", 18, False, INK)
 
     # 11. limitations
     s = deck.slide("It is not perfect yet, and we know what to fix next.", (
@@ -784,23 +797,24 @@ def build() -> None:
         f"{pct(os_['false_reject_rate_known']['value'], 0)} of known photos; next we combine several signals and tune on "
         "more held-out species. Conformal sets are almost always one species, so the short list adds little; harder "
         "look-alikes or a higher coverage target would make it useful. We could not compare against the Pl@ntNet app or "
-        "a VLM because we had no API keys. And we use DINOv2, because the newer DINOv3 weights are gated."))
+        "a VLM because we had no API keys. The second encoder, DINOv2, adds only a fraction of a point over BioCLIP 2 "
+        "alone. And every test photo comes from iNaturalist, like the gallery, so real phone photos may be harder."))
     bullets(s, M, top + Inches(0.55), CW, Inches(4.6), [
         f"Unknown check catches {pct(os_['reject_rate_held_out']['value'], 0)} of unseen species. Next: combine signals.",
-        "Sets are nearly always one species. Next: test on harder look-alikes.",
         "Pl@ntNet and VLM baselines not run. Next: run both with API keys.",
-        "DINOv2 used; DINOv3 weights are gated. Next: licensed weights.",
-    ], size=22, gap=34)
+        f"DINOv2 adds {d['dino_gain']} over BioCLIP 2 alone. Next: DINOv3 or drop it.",
+        "Test photos are from iNaturalist, like the gallery. Next: own phone photos.",
+    ], size=22, gap=28)
 
     # 12. thank you
     s = deck.slide(None, (
-        f"To sum up: VanaLens names {st['species']} common plants at {pct(one['top1'])} from one photo and {pct(three['top1'])} "
+        f"To sum up: VanaLens names {st['species']} common plants at {pct(one['top1'])} from one photo with location and {pct(three['top1'])} "
         "from up to three, with calibrated confidence, and adds a new species from a few photos without retraining. "
         "Thank you. We are happy to take questions."),
         foot=credit(meta, ["delonix"]))
     text(s, M, Inches(1.6), Inches(6.2), Inches(1.0), "Thank you", 36, True, ACCENT)
     text(s, M, Inches(2.55), Inches(6.2), Inches(0.8), "Questions welcome.", 24, False, INK)
-    for i, (big, lab) in enumerate([(pct(one["top1"]), "top-1, one photo"), (pct(three["top1"]), "top-1, up to 3 photos"),
+    for i, (big, lab) in enumerate([(pct(one["top1"]), "top-1, 1 photo + location"), (pct(three["top1"]), "top-1, up to 3 photos"),
                                     (pct(fs5["top1_new"]["value"], 0), "new species from 5 photos")]):
         tile(s, M + i * Inches(2.05), Inches(3.9), Inches(1.9), Inches(1.5), big, lab)
     picture(s, crop_photo("delonix", 0.8), Inches(8.0), Inches(0.6), Inches(4.6), int(Inches(4.6) / 0.8))

@@ -1,0 +1,21 @@
+{
+  "n_test_photos": 12831,
+  "n_test_observations": 9097,
+  "india_share_test_photos": 0.7001,
+  "india_share_test_observations": 0.7014,
+  "species_with_test": 607,
+  "test_obs_per_species": {
+    "min": 9,
+    "median": 15,
+    "max": 15
+  },
+  "test_photos_per_species": {
+    "min": 15,
+    "median": 21,
+    "max": 35
+  },
+  "test_obs_with_gps": 9094,
+  "test_obs_same_spot_as_gallery_or_cal": 82,
+  "same_spot_share": 0.009,
+  "same_spot_rule": "same species and lat/lon equal after rounding to 4 decimals (about 11 m)"
+}

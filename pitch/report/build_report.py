@@ -196,6 +196,45 @@ def labels_count(ds: str) -> int | None:
     return len(json.loads(p.read_text(encoding="utf-8"))) if p.exists() else None
 
 
+def wilson(p: Any, n: Any) -> str:
+    """95% Wilson score interval for a proportion p over n trials, as '95% CI a to b' (percent)."""
+    try:
+        p, n = float(p), int(n)
+    except (TypeError, ValueError):
+        return NM
+    if n <= 0:
+        return NM
+    z = 1.96
+    den = 1 + z * z / n
+    mid = (p + z * z / (2 * n)) / den
+    half = z * ((p * (1 - p) / n + z * z / (4 * n * n)) ** 0.5) / den
+    return f"95% CI {100 * (mid - half):.1f} to {100 * (mid + half):.1f}"
+
+
+def dino_note(short: bool = False) -> str:
+    """What the DINO block adds, from the L6-e single-encoder probes (BioCLIP 2-only vs DINO-only vs both)."""
+    ents = {e["name"].lower(): e for e in _bl_entries("vl600")}
+    def find(*keys):
+        for k, e in ents.items():
+            if all(x in k for x in keys):
+                return _metric(e, "top1")
+        return (None, None)
+    bc, dn, both = find("bioclip", "only"), find("dino", "only"), find("concatenated")
+    if bc[0] is None or dn[0] is None or both[0] is None:
+        return ("the kNN row is the cleanest test of whether the second encoder adds information, since kNN uses "
+                "the whole vector without any training.")
+    gain = 100 * (both[0] - bc[0])
+    overlap = bool(bc[1] and both[1] and bc[1][1] >= both[1][0])
+    tail = ("the two intervals overlap" if overlap else "the two intervals do not overlap")
+    if short:
+        return (f"a linear probe on BioCLIP 2 features alone reaches {pct(bc[0])} top-1 against {pct(both[0])} on "
+                f"both encoders ({gain:+.1f} points, {tail})")
+    return (f"The baselines in Table H2H measure what the repaired second encoder adds: a linear probe on BioCLIP 2 "
+            f"features alone reaches {pct_ci(*bc)}, on DINOv2 features alone {pct_ci(*dn)}, and on both "
+            f"{pct_ci(*both)}. DINOv2 is clearly weaker on its own and adds {gain:+.1f} points to BioCLIP 2 "
+            f"({tail}); most of the visual signal comes from the biology-trained encoder.")
+
+
 def derived() -> dict[str, str]:
     d: dict[str, str] = {}
     for ds, tag in (("vl600", "vl"), ("inat_india", "in")):
@@ -240,19 +279,18 @@ def derived() -> dict[str, str]:
         "after them refreshes every number and table."
     )
     d["knn_note"] = (
-        "The kNN scorer is the weakest here, consistent with the broken DINO half described in Section 3.11: kNN is "
+        "The kNN scorer is the weakest here, consistent with the broken DINO half described in Section 4.11: kNN is "
         "the only scorer that cannot learn to ignore part of the vector." if not post_fix() else
-        "With the DINO half repaired, the kNN row is the cleanest test of whether the second encoder adds information, "
-        "since kNN uses the whole vector without any training.")
+        dino_note())
     fin = J("L6/final.json")
     e2e_unk = (J("L6/e2e_vl600.json") or {}).get("unknown_rate")
     d["e2e_note"] = (
         f"{d['e2e_unknown_vl']} of the answers were flagged \"not in catalogue\". "
         + ("Before the DINO fix, live and cached DINO vectors disagree, so every live photo looks far from the gallery; "
-           "this is the clearest symptom of the bug in Section 3.11 and the first number to recheck after the fix."
+           "this is the clearest symptom of the bug in Section 4.11 and the first number to recheck after the fix."
            if not post_fix() else
            "This run used the repaired DINO loader, so live and cached vectors agree; the remaining rejections come "
-           "from the open-set gate itself (Section 6.6).")
+           "from the open-set gate itself (Section 7.6).")
         if e2e_unk is not None else "The share flagged \"not in catalogue\" was not measured.")
     sp, fam = rv("vl600", "+ geo prior", "top1"), rv("vl600", "+ geo prior", "family_top1")
     d["fam_recover_vl"] = NM if sp is None or fam is None or sp >= 1 else f"{100 * (fam - sp) / (1 - sp):.0f}%"
@@ -261,19 +299,47 @@ def derived() -> dict[str, str]:
     ms = rv("vl600", "+ geo prior", "mean_set_size")
     d["sets_note"] = (
         "but they are almost always a single species. This is not a success of the sets; it is a property of the "
-        "threshold rule when the model is already more than 90% accurate (Section 7)"
+        "threshold rule when the model is already more than 90% accurate (Section 8)"
         if ms is not None and ms < 1.05 else
         f"with a mean set size of {NM if ms is None else f'{ms:.2f}'} species on vl600")
     sel = val(dig(fin, "extras.vl600.selective.test_accuracy_answered"))
-    d["selective_note"] = (
-        "below the target: the post-cutoff test photos are harder than the pre-cutoff calibration photos, so a "
-        "threshold tuned on calibration is too permissive on test"
-        if sel is not None and sel < 0.95 else "which meets the target on test as well")
+    share = val(dig(fin, "extras.vl600.selective.test_share_answered"))
+    cal_acc = val(dig(fin, "extras.vl600.selective.cal_accuracy_answered"))
+    if sel is not None and sel < 0.95 and share is not None and share >= 0.999:
+        d["selective_note"] = (
+            f"below the target, and with {pct(share)} of test photos answered the selective step does nothing on "
+            f"vl600: calibration accuracy was already {pct(cal_acc)} with every photo answered, so the threshold "
+            "chosen there rejects nothing, while the post-cutoff test photos are harder")
+    else:
+        d["selective_note"] = (
+            "below the target: the post-cutoff test photos are harder than the pre-cutoff calibration photos, so a "
+            "threshold tuned on calibration is too permissive on test"
+            if sel is not None and sel < 0.95 else "which meets the target on test as well")
     qh = dig(ab, "state.ensemble.qhat") or dig(ab, "state.qhat")
     d["qhat_vl"] = NM if qh is None else f"{qh:.3f}"
     d["dino_benefit"] = (
         "and the system has not yet been shown to benefit from a second encoder" if not post_fix() else
-        "so the benefit of the second encoder rests on a single re-run made close to the deadline")
+        "and even after the fix the second encoder adds little: " + dino_note(short=True))
+    e_f, e_t = dig(ab, "rows.fused.ece"), dig(ab, "rows.fused+T.ece")
+    if e_f is None or e_t is None:
+        d["temp_note"] = "the temperature step leaves top-1 unchanged (its effect on calibration error was not measured)"
+    elif e_t < e_f - 0.001:
+        d["temp_note"] = (f"the temperature step cuts calibration error from {pct(e_f)} to {pct(e_t)} "
+                          "without changing top-1")
+    else:
+        d["temp_note"] = (f"the temperature step changes neither top-1 nor calibration error here ({pct(e_f)} before, "
+                          f"{pct(e_t)} after), because the fused scores were already well calibrated on this test set")
+    e2e = J("L6/e2e_vl600.json") or {}
+    d["e2e_ci_vl"] = wilson(e2e.get("top1"), e2e.get("n"))
+    rs_path = Path(__file__).with_name("review_stats.json")      # written by review_stats.py (L7-d)
+    rs = json.loads(rs_path.read_text(encoding="utf-8")) if rs_path.exists() else {}
+    d["india_test_vl"] = NM if rs.get("india_share_test_observations") is None else pct(rs["india_share_test_observations"])
+    tob, tph = rs.get("test_obs_per_species") or {}, rs.get("test_photos_per_species") or {}
+    d["test_obs_sp_vl"] = NM if not tob else f"{tob['min']} to {tob['max']} (median {tob['median']:g})"
+    d["test_ph_sp_vl"] = NM if not tph else f"{tph['min']} to {tph['max']} (median {tph['median']:g})"
+    d["same_spot_vl"] = (NM if rs.get("test_obs_same_spot_as_gallery_or_cal") is None else
+                         f"{rs['test_obs_same_spot_as_gallery_or_cal']:,} of {rs['test_obs_with_gps']:,} "
+                         f"({pct(rs['same_spot_share'])})")
     d["fix_short"] = "after the DINO loader fix" if post_fix() else "before the DINO loader fix, so the DINO half is random"
     ens = dig(ab, "state.ensemble.weights") or {}
     d["ens_weights"] = ", ".join(f"{k} {v:g}" for k, v in ens.items()) or NM

@@ -6,8 +6,15 @@ from PIL import Image
 
 from eval.harness import evaluate
 from eval.metrics import auroc, ece, macro_top1, rank_acc, topk_acc
-from vanalens.contracts import Sample
-from vanalens.data import cap_per_class, grouped_split, read_exif_gps, read_manifest, write_manifest
+from vanalens.contracts import Sample, Taxon, load_taxa, save_taxa
+from vanalens.data import (
+    cap_per_class,
+    grouped_split,
+    load_inat_india,
+    read_exif_gps,
+    read_manifest,
+    write_manifest,
+)
 
 P3 = np.array([[0.7, 0.2, 0.1], [0.1, 0.3, 0.6], [0.5, 0.4, 0.1]])
 Y3 = np.array([0, 1, 1])
@@ -78,3 +85,23 @@ def test_exif_none_without_gps(tmp_path):
     p = tmp_path / "a.jpg"
     Image.new("RGB", (8, 8)).save(p)
     assert read_exif_gps(str(p)) is None
+
+
+def test_load_inat_india(tmp_path):
+    sp_dir = tmp_path / "Ficus religiosa"
+    sp_dir.mkdir(parents=True)
+    img_path = sp_dir / "1001.jpg"
+    Image.new("RGB", (8, 8)).save(img_path)
+    save_taxa([Taxon(0, "Ficus religiosa", "Ficus", "Moraceae", 5361909)], tmp_path / "labels.json")
+    (tmp_path / "meta.csv").write_text(
+        "image,lat,lon,obs_id,observed_on,license,url\n"
+        "Ficus religiosa/1001.jpg,23.18,79.99,1001,2025-08-01,cc-by,https://example.com/1001.jpg\n",
+        encoding="utf-8",
+    )
+    samples, taxa = load_inat_india(tmp_path)
+    assert len(taxa) == 1 and taxa[0].species == "Ficus religiosa" and taxa[0].genus == "Ficus"
+    assert len(samples) == 1
+    assert samples[0].source == "inat"
+    assert samples[0].group == "1001"
+    assert samples[0].lat == 23.18 and samples[0].lon == 79.99
+    assert load_taxa(tmp_path / "labels.json") == taxa

@@ -2,9 +2,240 @@
  "dataset": "inat_india",
  "split": "test",
  "n_test": 558,
+ "final_row": "ensemble",
+ "head_grids": {
+  "probe": [
+   {
+    "weight_decay": 0.0,
+    "label_smoothing": 0.0,
+    "balanced": false,
+    "cal_top1": 0.8146,
+    "cal_nll": 1.1054,
+    "best_epoch": 59
+   },
+   {
+    "weight_decay": 0.0,
+    "label_smoothing": 0.0,
+    "balanced": true,
+    "cal_top1": 0.8258,
+    "cal_nll": 1.128,
+    "best_epoch": 57
+   },
+   {
+    "weight_decay": 0.0,
+    "label_smoothing": 0.1,
+    "balanced": false,
+    "cal_top1": 0.8258,
+    "cal_nll": 1.104,
+    "best_epoch": 59
+   },
+   {
+    "weight_decay": 0.0,
+    "label_smoothing": 0.1,
+    "balanced": true,
+    "cal_top1": 0.8427,
+    "cal_nll": 1.1129,
+    "best_epoch": 59
+   },
+   {
+    "weight_decay": 1e-05,
+    "label_smoothing": 0.0,
+    "balanced": false,
+    "cal_top1": 0.8146,
+    "cal_nll": 1.1053,
+    "best_epoch": 59
+   },
+   {
+    "weight_decay": 1e-05,
+    "label_smoothing": 0.0,
+    "balanced": true,
+    "cal_top1": 0.8258,
+    "cal_nll": 1.0957,
+    "best_epoch": 59
+   },
+   {
+    "weight_decay": 1e-05,
+    "label_smoothing": 0.1,
+    "balanced": false,
+    "cal_top1": 0.8258,
+    "cal_nll": 1.104,
+    "best_epoch": 59
+   },
+   {
+    "weight_decay": 1e-05,
+    "label_smoothing": 0.1,
+    "balanced": true,
+    "cal_top1": 0.8427,
+    "cal_nll": 1.1129,
+    "best_epoch": 59
+   },
+   {
+    "weight_decay": 0.0001,
+    "label_smoothing": 0.0,
+    "balanced": false,
+    "cal_top1": 0.809,
+    "cal_nll": 1.1052,
+    "best_epoch": 59
+   },
+   {
+    "weight_decay": 0.0001,
+    "label_smoothing": 0.0,
+    "balanced": true,
+    "cal_top1": 0.8258,
+    "cal_nll": 1.0947,
+    "best_epoch": 59
+   },
+   {
+    "weight_decay": 0.0001,
+    "label_smoothing": 0.1,
+    "balanced": false,
+    "cal_top1": 0.8258,
+    "cal_nll": 1.1043,
+    "best_epoch": 59
+   },
+   {
+    "weight_decay": 0.0001,
+    "label_smoothing": 0.1,
+    "balanced": true,
+    "cal_top1": 0.8427,
+    "cal_nll": 1.1128,
+    "best_epoch": 59
+   },
+   {
+    "weight_decay": 0.001,
+    "label_smoothing": 0.0,
+    "balanced": false,
+    "cal_top1": 0.8146,
+    "cal_nll": 1.1049,
+    "best_epoch": 59
+   },
+   {
+    "weight_decay": 0.001,
+    "label_smoothing": 0.0,
+    "balanced": true,
+    "cal_top1": 0.8371,
+    "cal_nll": 1.0882,
+    "best_epoch": 59
+   },
+   {
+    "weight_decay": 0.001,
+    "label_smoothing": 0.1,
+    "balanced": false,
+    "cal_top1": 0.8315,
+    "cal_nll": 1.1085,
+    "best_epoch": 59
+   },
+   {
+    "weight_decay": 0.001,
+    "label_smoothing": 0.1,
+    "balanced": true,
+    "cal_top1": 0.8483,
+    "cal_nll": 1.1141,
+    "best_epoch": 59
+   }
+  ],
+  "mlp": [
+   {
+    "weight_decay": 0.0,
+    "label_smoothing": 0.0,
+    "balanced": false,
+    "cal_top1": 0.9101,
+    "cal_nll": 0.4159,
+    "best_epoch": 57
+   },
+   {
+    "weight_decay": 0.0,
+    "label_smoothing": 0.0,
+    "balanced": true,
+    "cal_top1": 0.9045,
+    "cal_nll": 0.5176,
+    "best_epoch": 43
+   },
+   {
+    "weight_decay": 0.0,
+    "label_smoothing": 0.1,
+    "balanced": false,
+    "cal_top1": 0.9326,
+    "cal_nll": 0.6018,
+    "best_epoch": 58
+   },
+   {
+    "weight_decay": 0.0,
+    "label_smoothing": 0.1,
+    "balanced": true,
+    "cal_top1": 0.9157,
+    "cal_nll": 0.7044,
+    "best_epoch": 56
+   },
+   {
+    "weight_decay": 1e-05,
+    "label_smoothing": 0.0,
+    "balanced": false,
+    "cal_top1": 0.9045,
+    "cal_nll": 0.4111,
+    "best_epoch": 59
+   },
+   {
+    "weight_decay": 1e-05,
+    "label_smoothing": 0.0,
+    "balanced": true,
+    "cal_top1": 0.9101,
+    "cal_nll": 0.4153,
+    "best_epoch": 56
+   },
+   {
+    "weight_decay": 1e-05,
+    "label_smoothing": 0.1,
+    "balanced": false,
+    "cal_top1": 0.927,
+    "cal_nll": 0.6017,
+    "best_epoch": 59
+   },
+   {
+    "weight_decay": 1e-05,
+    "label_smoothing": 0.1,
+    "balanced": true,
+    "cal_top1": 0.9157,
+    "cal_nll": 0.7017,
+    "best_epoch": 57
+   },
+   {
+    "weight_decay": 0.0001,
+    "label_smoothing": 0.0,
+    "balanced": false,
+    "cal_top1": 0.9045,
+    "cal_nll": 0.4108,
+    "best_epoch": 59
+   },
+   {
+    "weight_decay": 0.0001,
+    "label_smoothing": 0.0,
+    "balanced": true,
+    "cal_top1": 0.9101,
+    "cal_nll": 0.4111,
+    "best_epoch": 57
+   },
+   {
+    "weight_decay": 0.0001,
+    "label_smoothing": 0.1,
+    "balanced": false,
+    "cal_top1": 0.9326,
+    "cal_nll": 0.6001,
+    "best_epoch": 58
+   },
+   {
+    "weight_decay": 0.0001,
+    "label_smoothing": 0.1,
+    "balanced": true,
+    "cal_top1": 0.9157,
+    "cal_nll": 0.7337,
+    "best_epoch": 49
+   }
+  ]
+ },
  "state": {
   "dataset": "inat_india",
-  "created": "2026-11-15 13:48",
+  "created": "2026-11-15 18:42",
   "n_classes": 52,
   "scorers": [
    "knn",
@@ -13,27 +244,108 @@
   ],
   "weights": {
    "knn": 0.0,
-   "probe": 0.8,
-   "text": 0.2
+   "probe": 0.4,
+   "text": 0.6
   },
-  "T": 0.5983075272601287,
+  "T": 0.6407193958393873,
   "alpha": 0.1,
-  "qhat": 0.4634852750253313,
+  "qhat": 0.4331925302793046,
   "thr": 1.413437795639038,
   "knn": {
    "k": 10,
    "temperature": 0.05
   },
   "probe": {
+   "backend": "torch",
+   "weights": "C:\\Users\\divya\\vanalens-cache\\state\\inat_india_probe_mlp.npz",
+   "config": {
+    "hidden": 1024,
+    "dropout": 0.5,
+    "weight_decay": 0.0001,
+    "label_smoothing": 0.1,
+    "balanced": false,
+    "lr": 0.001,
+    "epochs": 60,
+    "batch_size": 1024,
+    "patience": 8,
+    "scale": 10.0,
+    "best_epoch": 58
+   },
+   "head": "mlp",
    "C": 100.0
   },
+  "default_head": {
+   "choice": "mlp",
+   "rule": "mlp only if cal top1 > linear + 0.01",
+   "cal_top1": {
+    "probe": 0.8483,
+    "mlp": 0.9326
+   }
+  },
+  "heads": {
+   "probe": {
+    "backend": "torch",
+    "weights": "C:\\Users\\divya\\vanalens-cache\\state\\inat_india_probe_linear.npz",
+    "config": {
+     "hidden": 0,
+     "dropout": 0.0,
+     "weight_decay": 0.001,
+     "label_smoothing": 0.1,
+     "balanced": true,
+     "lr": 0.001,
+     "epochs": 60,
+     "batch_size": 1024,
+     "patience": 8,
+     "scale": 10.0,
+     "best_epoch": 59
+    }
+   },
+   "mlp": {
+    "backend": "torch",
+    "weights": "C:\\Users\\divya\\vanalens-cache\\state\\inat_india_probe_mlp.npz",
+    "config": {
+     "hidden": 1024,
+     "dropout": 0.5,
+     "weight_decay": 0.0001,
+     "label_smoothing": 0.1,
+     "balanced": false,
+     "lr": 0.001,
+     "epochs": 60,
+     "batch_size": 1024,
+     "patience": 8,
+     "scale": 10.0,
+     "best_epoch": 58
+    }
+   }
+  },
+  "ensemble": {
+   "scorers": [
+    "knn",
+    "probe",
+    "mlp",
+    "text"
+   ],
+   "weights": {
+    "knn": 0.0,
+    "probe": 0.1,
+    "mlp": 0.4,
+    "text": 0.5
+   },
+   "T": 0.558703075793673,
+   "qhat": 0.413224224858452,
+   "cal_top1": 0.9551,
+   "fused_cal_top1": 0.9494,
+   "kept": true
+  },
+  "final": "ensemble",
   "text": {
    "temperature": 0.01,
    "protos": "C:\\Users\\divya\\vanalens-cache\\text\\inat_india.npz",
-   "missing_species": [
-    "Diplocyclos palmatus",
-    "Leonotis nepetifolia"
-   ]
+   "missing_species": []
+  },
+  "train_rows": {
+   "gallery": 692,
+   "aug": 0
   },
   "n": {
    "gallery": 692,
@@ -47,46 +359,105 @@
    "top5": 0.9427,
    "macro_top1": 0.7956,
    "nll": 1.729,
-   "ece": 0.1225
+   "ece": 0.1225,
+   "coverage": 0.8656,
+   "mean_set_size": 1.2168,
+   "singleton_rate": 0.7849,
+   "genus_top1": 0.8244,
+   "family_top1": 0.819,
+   "cal_top1": 0.8764
   },
   "probe": {
-   "top1": 0.9211,
-   "top5": 0.9875,
-   "macro_top1": 0.9057,
-   "nll": 0.438,
-   "ece": 0.163
+   "top1": 0.8889,
+   "top5": 0.9785,
+   "macro_top1": 0.8699,
+   "nll": 1.1256,
+   "ece": 0.4904,
+   "coverage": 0.9462,
+   "mean_set_size": 1.4695,
+   "singleton_rate": 0.6057,
+   "genus_top1": 0.8943,
+   "family_top1": 0.8548,
+   "cal_top1": 0.8483
   },
   "text": {
-   "top1": 0.4982,
-   "top5": 0.991,
-   "macro_top1": 0.4844,
-   "nll": 1.9842,
-   "ece": 0.2314
+   "top1": 0.9606,
+   "top5": 0.9964,
+   "macro_top1": 0.9514,
+   "nll": 0.1481,
+   "ece": 0.0215,
+   "coverage": 0.9677,
+   "mean_set_size": 1.0161,
+   "singleton_rate": 0.9839,
+   "genus_top1": 0.9659,
+   "family_top1": 0.9677,
+   "cal_top1": 0.9157
   },
   "fused": {
-   "top1": 0.9534,
+   "top1": 0.9659,
    "top5": 0.9946,
-   "macro_top1": 0.9418,
-   "nll": 0.2611,
-   "ece": 0.1066
-  },
-  "fused+T": {
-   "top1": 0.9534,
-   "top5": 0.9946,
-   "macro_top1": 0.9418,
-   "nll": 0.1732,
-   "ece": 0.0232
-  },
-  "fused+T+sets": {
-   "top1": 0.9534,
-   "top5": 0.9946,
-   "macro_top1": 0.9418,
-   "nll": 0.1732,
-   "ece": 0.0232,
-   "coverage": 0.9534,
+   "macro_top1": 0.9567,
+   "nll": 0.1542,
+   "ece": 0.0461,
+   "coverage": 0.9659,
    "mean_set_size": 1.0,
    "singleton_rate": 1.0,
+   "genus_top1": 0.9713,
+   "family_top1": 0.9713,
+   "cal_top1": 0.9494
+  },
+  "fused+T": {
+   "top1": 0.9659,
+   "top5": 0.9946,
+   "macro_top1": 0.9567,
+   "nll": 0.1268,
+   "ece": 0.0163,
+   "coverage": 0.9659,
+   "mean_set_size": 1.0,
+   "singleton_rate": 1.0,
+   "genus_top1": 0.9713,
+   "family_top1": 0.9749,
+   "cal_top1": 0.9494
+  },
+  "fused+T+sets": {
+   "top1": 0.9659,
+   "top5": 0.9946,
+   "macro_top1": 0.9567,
+   "nll": 0.1268,
+   "ece": 0.0163,
+   "coverage": 0.9659,
+   "mean_set_size": 1.0,
+   "singleton_rate": 1.0,
+   "genus_top1": 0.9713,
+   "family_top1": 0.9749,
+   "cal_top1": 0.9494,
    "unknown_rate": 0.0663
+  },
+  "mlp": {
+   "top1": 0.905,
+   "top5": 0.9875,
+   "macro_top1": 0.8862,
+   "nll": 0.6872,
+   "ece": 0.2993,
+   "coverage": 0.9301,
+   "mean_set_size": 1.0806,
+   "singleton_rate": 0.9229,
+   "genus_top1": 0.9194,
+   "family_top1": 0.914,
+   "cal_top1": 0.9326
+  },
+  "ensemble": {
+   "top1": 0.9677,
+   "top5": 0.9946,
+   "macro_top1": 0.9605,
+   "nll": 0.1259,
+   "ece": 0.0165,
+   "coverage": 0.9677,
+   "mean_set_size": 1.0,
+   "singleton_rate": 1.0,
+   "genus_top1": 0.9731,
+   "family_top1": 0.9749,
+   "cal_top1": 0.9551
   }
  }
 }

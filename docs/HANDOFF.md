@@ -110,3 +110,7 @@ Never cut: baseline table, conformal sets, evidence panel, inat_india test split
   all caches), L3-d (refit on cal), L6-d (re-run final.json + live e2e); L7-c now also depends on L6-d and refreshes
   the deck numbers. Reported results so far (vl600 1-photo .939) are effectively BioCLIP-only.
 - 2026-11-15 23:58 dispatcher: L2-f thread failed with "Antigravity quota reached" (fix_dino job died at 20:58, vl600_gallery shard 9/20); L2 provider -> Claude in PLAN.json, L2-f re-dispatched with --resume.
+- 2026-11-16 00:05 lead: L2-f lost ~3 h (Antigravity quota at 20:58, caught as stale at 23:59). To protect the 05:45
+  deadline: L7-c (report) now depends only on L7-b and runs in parallel with L2-f/L3-d/L6-d, writing numbers through a
+  generated include; L7-d now depends on L7-c + L6-d and first refreshes all deck/report numbers. stale_minutes 230 -> 120
+  so a dead thread is caught within 2 h (remaining cards are all < 2 h).

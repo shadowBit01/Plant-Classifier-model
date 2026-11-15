@@ -31,7 +31,7 @@ New tests go in new files you own; never edit someone else's test.
 | 3-6 | L1-b, then L2-b, L2-c (GPU), L1-c | inat_india manifests + embeddings cached; baseline JSONs in `runs/` |
 | 6-9 | Claude: L3-b then L6-a. Antigravity B: L4-b | **MVP: real pipeline answers an inat_india test photo** |
 | 9-16 | L6-b, L5-b | final table `runs/L6/final.json` |
-| wave 2 | L1-d (vl600), then L2-e + L4-c, L5-c; then L3-c, L6-c, L7-b (deck); DINO fix L2-f, then L3-d, L6-d; then L7-c (report), L7-d (review) | runs/L6/final.json has vl600 with CIs; report + reviewed deck |
+| wave 2 | L1-d (vl600), then L2-e + L4-c, L5-c; then L3-c, L6-c, L7-b (deck); DINO fix L2-f, then L3-d, L6-d, in parallel with L7-c (report); then L7-d (review + number refresh) | runs/L6/final.json has vl600 with CIs; report + reviewed deck |
 | 16-19 | fixes only | feature freeze at 19 |
 | 19-24 | Claude: L7-a builds `pitch/VanaLens.pptx` from `runs/L6/final.json` | human rehearses |
 
@@ -493,9 +493,11 @@ few-shot, per-growth-form or hardest-species error analysis if the data allows);
 implementation (specific and honest); 8 How we plan to overcome them and improve (one concrete step per limitation,
 plus future features such as offline mobile app, more regional species, expert feedback loop); 9 Conclusion;
 References. Figures from pitch/*.png; add a confusion example figure if helpful. Use only numbers that exist in
-runs/; where a result is missing say "not measured". The numbers changed after L2-f/L3-d/L6-d (DINO
-weight-loading fix): also rebuild the deck charts and slide numbers from the new runs/L6/final.json (scripts/build_deck.py),
-re-export pitch/preview/, and describe the bug and its fix briefly and honestly in the report (methods or limitations). Write clearly and concretely. No em dashes.
+runs/; where a result is missing say "not measured". L2-f/L3-d/L6-d (DINO weight-loading fix, see
+docs/HANDOFF.md 19:55) are re-running in parallel and will change the numbers: write the report now from the current
+runs/ files, but make every result number come from a small generated include (e.g. build_report.py reads runs/L6/final.json
+and runs/L3/ablation_*.json and fills the tables), so L7-d can refresh it with one rebuild; describe the bug and its
+fix briefly and honestly (methods or limitations). Write clearly and concretely. No em dashes.
 When done, inside `.lanes/L7`: DONE entry in worklog/L7.md, commit with prefix [L7], `git push origin HEAD:lane/L7-pitch`, stop.
 ```
 
@@ -509,6 +511,8 @@ photos per species, baselines not run, unfair comparisons, overclaiming, unclear
 Fix what the existing results in runs/ can fix (wording, missing numbers, CIs, figures, layout); move everything else
 into the report's Limitations section. Rewrite pitch/demo.md to cover: a known plant; an unknown plant (rejected,
 then added with 5 photos and recognised); a 3-photo plant; a photo with GPS (show the location prior effect); and a
-fallback if Wi-Fi fails. Rebuild the deck (re-export and re-check slide PNGs) and the PDF. No em dashes.
+fallback if Wi-Fi fails. First refresh all numbers from the re-run results (L6-d runs/L6/final.json, L3-d
+ablations): rebuild the deck charts and slide numbers (scripts/build_deck.py) and the report tables, and update any text whose
+claim changed (which metrics reach 95%, open-set, live demo). Rebuild the deck (re-export and re-check slide PNGs) and the PDF. No em dashes.
 When done, inside `.lanes/L7`: DONE entry in worklog/L7.md, commit with prefix [L7], `git push origin HEAD:lane/L7-pitch`, stop.
 ```

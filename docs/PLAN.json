@@ -1,5 +1,5 @@
 {
- "stale_minutes": 230,
+ "stale_minutes": 120,
  "max_threads_per_provider": 2,
  "lanes": {
   "L1": {
@@ -215,14 +215,14 @@
   {
    "id": "L7-c",
    "deps": [
-    "L7-b",
-    "L6-d"
+    "L7-b"
    ]
   },
   {
    "id": "L7-d",
    "deps": [
-    "L7-c"
+    "L7-c",
+    "L6-d"
    ]
   },
   {

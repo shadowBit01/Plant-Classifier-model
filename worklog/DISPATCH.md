@@ -394,3 +394,9 @@ Append-only. One entry per dispatcher run. Format: AGENTS.md section 6.
 - Did: run 60 (human asked): L7-f thread showed failed: provider errors only (Claude 5h limit, Antigravity quota, then connection loss), work uncommitted in .lanes/L7; moved thread to Claude, resumed L7-f (commit WIP, finish, DONE). Logged in HANDOFF.
 - Needs: HUMAN: review stashes "autopilot" from runs 51 and 54 (regenerated pitch/report files)
 - Next: merge L7 after L7-f DONE; then all_done -> PROJECT COMPLETE.
+
+## 2026-11-16 02:14 | DISPATCH | DONE
+- Did: run 61: ran next_cards.py --fetch -> needs_merge=["L5", "L7"], dispatch=[], in_flight=[], blocked=[], all_done=false. Verified ownership clean for L5 (L5-fix160201, 3 files) and L7 (L7-f, 22 files). Could not run merge_lanes.py: this scheduled thread started in worktree t3-17ccf448-264ea99b93538cdd (branch t3/vanalens-dispatcher-run) instead of project root C:\Users\divya\Plant-Classifier-model (branch main), and sandbox blocks access to the project root.
+- Needs: HUMAN: run the dispatcher (or scripts/merge_lanes.py) in Local mode at C:\Users\divya\Plant-Classifier-model on branch main, and re-bind the scheduled dispatcher task to Local mode (root) instead of worktree mode.
+- Next: merge L5 and L7 via merge_lanes.py on main; then all_done will be true and pitch/VanaLens.pptx is present -> PROJECT COMPLETE.
+

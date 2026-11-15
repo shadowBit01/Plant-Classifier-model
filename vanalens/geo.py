@@ -130,3 +130,68 @@ def apply_prior(P: np.ndarray, prior: np.ndarray, beta: float = 0.5) -> np.ndarr
     weighted = P * (prior ** beta)
     total = weighted.sum(axis=1, keepdims=True)
     return weighted / total
+
+
+def prefetch_gbif_cells(
+    coords: list[tuple[float, float]],
+    radius_km: int = 50,
+    kingdom_key: int = 6,
+    cache_dir: Path | None = None,
+    max_workers: int = 10,
+    retries: int = 4,
+) -> int:
+    """Pre-fetch and cache GBIF occurrence counts for a list of (lat, lon) coordinates in parallel.
+    Skips coordinates whose 0.5-degree grid cell is already cached.
+    Retries uncached cells across multiple passes.
+    Returns total count of unique cells cached."""
+    import time
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from .config import CACHE_DIR
+
+    if cache_dir is None:
+        cache_dir = CACHE_DIR / "gbif"
+    cache_dir = Path(cache_dir)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    unique_cells = set()
+    for lat, lon in coords:
+        if lat is not None and lon is not None:
+            cell_lat = round(lat * 2) / 2
+            cell_lon = round(lon * 2) / 2
+            unique_cells.add((cell_lat, cell_lon))
+
+    for attempt in range(retries):
+        to_fetch = [
+            (clat, clon)
+            for (clat, clon) in unique_cells
+            if not (cache_dir / f"{clat}_{clon}_{radius_km}_{kingdom_key}.json").exists()
+        ]
+        if not to_fetch:
+            break
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [
+                executor.submit(
+                    gbif_species_counts,
+                    lat=clat,
+                    lon=clon,
+                    radius_km=radius_km,
+                    kingdom_key=kingdom_key,
+                    cache_dir=cache_dir,
+                )
+                for clat, clon in to_fetch
+            ]
+            for f in as_completed(futures):
+                try:
+                    f.result()
+                except Exception:
+                    pass
+        time.sleep(1)
+
+    cached_count = sum(
+        1 for (clat, clon) in unique_cells
+        if (cache_dir / f"{clat}_{clon}_{radius_km}_{kingdom_key}.json").exists()
+    )
+    return cached_count
+
+

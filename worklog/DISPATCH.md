@@ -113,3 +113,11 @@ Append-only. One entry per dispatcher run. Format: AGENTS.md section 6.
 - Results: 0 merged, 0 dispatched, 0 blocked
 - Needs: none
 - Next: merge L1-d when DONE and dispatch the cards it unblocks (L2-e, L3-c, L6-c).
+
+## 2026-11-15 15:51 | DISPATCH | DONE
+- Did: pulled main (clean); nothing to merge, dispatch or unblock; L1-d (vl600) still in flight.
+- Files: worklog/DISPATCH.md
+- Tests: none
+- Results: 0 merged, 0 dispatched, 0 blocked
+- Needs: none
+- Next: merge L1-d when DONE and dispatch the cards it unblocks (L2-e, L3-c, L6-c).

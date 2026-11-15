@@ -24,6 +24,11 @@ Sections per dataset (final.json: datasets[ds] = list of rows, extras[ds] = the 
 - few_shot: on that refit model, add SHOTS gallery photos of every held-out species via add_species; top-1
   (over all classes) on their test photos, and known-species top-1 afterwards.
 - target: which headline numbers reach TARGET (point value, and whether the CI lower bound does too).
+
+`--baselines [ds ...]` (L6-e, default vl600): adds final.json["baselines"][ds] without touching any other key:
+B2 zero-shot (L2 point values, CI not available), BioCLIP-only / DINO-only linear probes (refit on gallery X + X_aug,
+early stop on cal), kNN only, the main linear head alone, text prototypes only, and the full VanaLens rows copied
+from the main table. top-1 / top-5 / macro top-1 with the main table's observation bootstrap.
 """
 from __future__ import annotations
 
@@ -514,6 +519,152 @@ def dataset_table(ds: str) -> tuple[list[dict], dict]:
     return rows, extras
 
 
+# ------------------------------------------------------------------------------------------- baselines (L6-e)
+BCOLS = ("top1", "top5", "macro_top1")
+FULL_ROWS = (("VanaLens full, 1 photo (no geo)", "VanaLens 1 photo (no geo)"),
+             ("VanaLens full, 1 photo + geo", "+ geo prior"),
+             ("VanaLens full, up to 3 photos + geo", "VanaLens up to 3 photos + geo"))
+
+
+def _brow(name: str, src: str, m: dict, note: str = "") -> dict:
+    """Baselines-block row: top-1, top-5, macro top-1, each with its 95% CI (by observation)."""
+    return {"method": name, "source": src, "n": m["n"], **{c: m[c]["value"] for c in BCOLS},
+            "ci": {c: m[c]["ci"] for c in BCOLS}, "note": note}
+
+
+def _bmetrics(P: np.ndarray, y: np.ndarray, gi: np.ndarray, boot: Boot) -> dict:
+    order = np.argsort(-P, axis=1, kind="stable")
+    top1 = order[:, 0] == y
+    return {"n": int(len(y)), "top1": boot.ratio(gi, top1),
+            "top5": boot.ratio(gi, (order[:, :5] == y[:, None]).any(1)), "macro_top1": boot.macro(gi, top1, y)}
+
+
+def _block_probe(X_tr, y_tr, X_cal, y_cal, n_classes: int, cfg: dict, device: str | None) -> HeadScorer:
+    """Linear head on one feature block (or the concatenation): the main linear head's config (balanced loss,
+    scale, lr, epochs), early stop on cal. dino_weight is 1: a single block needs no block weight."""
+    cfg = {k: v for k, v in cfg.items() if k not in ("best_epoch", "dino_weight", "hidden", "dropout")}
+    return HeadScorer(n_classes, hidden=0, device=device, dino_weight=1.0, **cfg).fit(X_tr, y_tr, X_cal, y_cal)
+
+
+def compute_baselines(data: dict, state: dict, text, n_classes: int, boot: Boot, b2: dict | None = None,
+                      main_rows: list[dict] | None = None, device: str | None = None) -> list[dict]:
+    """Head-to-head baselines on one test split, all from cached frozen embeddings.
+
+    data: Xg, yg, ids (gallery = kNN index and head training rows), Xa, ya (augmented gallery views, may be
+    empty), Xc, yc (cal: early stopping only), Xt, yt, gt (test rows and their bootstrap group index).
+    state: L3 state (knn params, the linear head's config and saved weights); text: (protos, strings) or None.
+    Nothing reads test except the final scoring.
+    """
+    from vanalens.config import BIOCLIP_DIM
+    from vanalens.scorers import KNNScorer, TextScorer
+
+    Xt, yt, gt = data["Xt"], data["yt"], data["gt"]
+    X_tr = np.concatenate([data["Xg"], data["Xa"]]).astype(np.float32) if len(data["Xa"]) else data["Xg"]
+    y_tr = np.concatenate([data["yg"], data["ya"]]).astype(np.int64) if len(data["Xa"]) else data["yg"]
+    aug = f"gallery {len(data['Xg'])} + aug {len(data['Xa'])} rows"
+    rows = []
+    if b2 and b2.get("n"):
+        rows.append({"method": "B2 BioCLIP 2 zero-shot", "source": "runs/L2/b2_<ds>.json", "n": b2["n"],
+                     **{c: b2.get(c) for c in BCOLS}, "ci": {c: "not available" for c in BCOLS},
+                     "note": "point values from L2 (no per-photo predictions saved: CI not available)"})
+    else:
+        rows.append({"method": "B2 BioCLIP 2 zero-shot", "source": "runs/L2/b2_<ds>.json", "n": None,
+                     **{c: None for c in BCOLS}, "ci": {c: "not available" for c in BCOLS}, "note": "no result"})
+    hcfg = dict((state.get("heads") or {}).get("probe", {}).get("config") or state.get("probe", {}).get("config")
+                or {})
+    blocks = (("BioCLIP 2-only linear probe", slice(0, BIOCLIP_DIM)),
+              ("DINO-only linear probe", slice(BIOCLIP_DIM, None)))
+    for name, sl in blocks:
+        h = _block_probe(X_tr[:, sl], y_tr, data["Xc"][:, sl], data["yc"], n_classes, hcfg, device)
+        rows.append(_brow(name, "HeadScorer linear, refit", _bmetrics(h.predict_proba(Xt[:, sl]), yt, gt, boot),
+                          note=f"{aug}; early stop on cal (best epoch {h.best_epoch})"))
+    kp = state.get("knn", {})
+    gal = EmbeddingSet(list(data["ids"]), data["Xg"], data["yg"])
+    knn = KNNScorer(gal, n_classes, k=kp.get("k", 10), temperature=kp.get("temperature", 0.05),
+                    dino_weight=kp.get("dino_weight", 1.0))
+    rows.append(_brow("kNN only (both blocks)", "KNNScorer, state params",
+                      _bmetrics(knn.predict_proba(Xt), yt, gt, boot),
+                      note=f"gallery {len(data['Xg'])} photos; k={knn.k}, dino_weight={knn.dino_weight} (cal)"))
+    path = state.get("probe", {}).get("weights")
+    if path and Path(path).exists() and state.get("probe", {}).get("config", {}).get("hidden", 0) == 0:
+        h, src = HeadScorer.load(path), "saved L3 linear head (state probe)"
+        note = "the main model's linear head alone, no fusion / T / geo"
+    else:
+        h = HeadScorer(n_classes, hidden=0, device=device,
+                       **{k: v for k, v in hcfg.items() if k not in ("best_epoch", "hidden", "dropout")}
+                       ).fit(X_tr, y_tr, data["Xc"], data["yc"])
+        src, note = "HeadScorer linear, refit", "refit on concatenated features"
+    rows.append(_brow("Concatenated-feature linear probe (no fusion)", src,
+                      _bmetrics(h.predict_proba(Xt), yt, gt, boot), note=f"{note}; {aug}"))
+    if text is not None:
+        ts = TextScorer(list(text[0]), [list(s) for s in text[1]],
+                        temperature=float(state.get("text", {}).get("temperature", 0.01)))
+        rows.append(_brow("Text prototypes only (0 images/species)", "TextScorer, cached BioCLIP 2 text protos",
+                          _bmetrics(ts.predict_proba(Xt), yt, gt, boot),
+                          note="trait + species-name prompts; no gallery images"))
+    by = {r["method"]: r for r in main_rows or []}
+    for name, src in FULL_ROWS:
+        r = by.get(src)
+        if r and r.get("status") == "ok":
+            rows.append({"method": name, "source": f"final.json main table: {src}", "n": r["n"],
+                         **{c: r[c] for c in BCOLS}, "ci": {c: r["ci"].get(c) for c in BCOLS}, "note": r["note"]})
+    return rows
+
+
+def baselines_for(ds: str, main_rows: list[dict]) -> list[dict]:
+    """Load the cached splits of ds and run compute_baselines with the main table's bootstrap (same resamples)."""
+    cache = config.CACHE_DIR
+    taxa = load_taxa(config.DATA_DIR / ds / "labels.json")
+    Xt, yt, _, groups = load_split(ds, "test")
+    boot = Boot(groups)
+    Xc, yc, _, _ = load_split(ds, "cal")
+    d = np.load(cache / "emb" / f"{ds}_gallery.npz", allow_pickle=False)
+    gal = EmbeddingSet.load(cache / "emb" / f"{ds}_gallery.npz")
+    has_aug = "X_aug" in d.files and "y_aug" in d.files
+    data = {"Xg": gal.X, "yg": np.asarray(gal.y, dtype=np.int64), "ids": gal.ids,
+            "Xa": d["X_aug"] if has_aug else np.empty((0, gal.X.shape[1]), np.float32),
+            "ya": d["y_aug"].astype(np.int64) if has_aug else np.empty(0, np.int64),
+            "Xc": Xc, "yc": yc, "Xt": Xt, "yt": yt, "gt": boot.gidx(groups)}
+    lens = VanaLens.from_cache(ds)
+    text = (lens.text.protos, lens.text.trait_strings) if lens.text is not None else None
+    b2f = config.RUNS_DIR / "L2" / f"b2_{ds}.json"
+    b2 = json.loads(b2f.read_text()) if b2f.exists() else None
+    rows = compute_baselines(data, lens.state, text, len(taxa), boot, b2, main_rows)
+    for r in rows:
+        r["source"] = r["source"].replace("<ds>", ds)
+    return rows
+
+
+def baselines_markdown(block: dict) -> str:
+    out = []
+    for ds, rows in block.items():
+        out += [f"### baselines: {ds}", "", "| method | n | top-1 | top-5 | macro top-1 | note |",
+                "|---|---|---|---|---|---|"]
+        for r in rows:
+            cells = [_cell(r[c], r["ci"][c] if isinstance(r["ci"].get(c), list) else None) for c in BCOLS]
+            out.append(f"| {r['method']} | {r['n']} | " + " | ".join(cells) + f" | {r['note']} |")
+        out.append("")
+    return "\n".join(out).rstrip()
+
+
+def main_baselines(datasets: list[str]) -> int:
+    """Add the "baselines" block to runs/L6/final.json; every other key is left untouched."""
+    path = config.RUNS_DIR / "L6" / "final.json"
+    table = json.loads(path.read_text())
+    block = dict(table.get("baselines", {}))
+    for ds in datasets:
+        block[ds] = baselines_for(ds, table["datasets"][ds])
+    table["baselines"] = block
+    table["baselines_info"] = {
+        "columns": list(BCOLS), "ci": f"95% percentile bootstrap over test observations ({N_BOOT}, seed {SEED}), "
+        "same resamples as the main table",
+        "protocol": "cached frozen embeddings; heads trained on gallery X + X_aug (as the main model), early stop on "
+                    "cal; kNN/text params from L3 state (cal); test only scored"}
+    path.write_text(json.dumps(table, indent=1))
+    print(baselines_markdown({ds: block[ds] for ds in datasets}))
+    return 0
+
+
 # ------------------------------------------------------------------------------------------- output
 def _cell(v, ci=None, n=False) -> str:
     if v is None:
@@ -566,6 +717,9 @@ def to_markdown(table: dict) -> str:
 
 
 def main() -> int:
+    if "--baselines" in sys.argv:            # L6-e: python scripts/final_table.py --baselines [ds ...]
+        rest = [a for a in sys.argv[sys.argv.index("--baselines") + 1:] if not a.startswith("-")]
+        return main_baselines(rest or ["vl600"])
     present = [d for d in DATASETS if (config.CACHE_DIR / "manifests" / f"{d}_test.jsonl").exists()]
     datasets, extras = {}, {}
     for ds in present:

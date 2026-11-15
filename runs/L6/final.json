@@ -1848,5 +1848,216 @@
  },
  "skipped_datasets": [
   "campus"
- ]
+ ],
+ "baselines": {
+  "vl600": [
+   {
+    "method": "B2 BioCLIP 2 zero-shot",
+    "source": "runs/L2/b2_vl600.json",
+    "n": 12831,
+    "top1": 0.873,
+    "top5": 0.9537,
+    "macro_top1": 0.8775,
+    "ci": {
+     "top1": "not available",
+     "top5": "not available",
+     "macro_top1": "not available"
+    },
+    "note": "point values from L2 (no per-photo predictions saved: CI not available)"
+   },
+   {
+    "method": "BioCLIP 2-only linear probe",
+    "source": "HeadScorer linear, refit",
+    "n": 12831,
+    "top1": 0.9318,
+    "top5": 0.9779,
+    "macro_top1": 0.9346,
+    "ci": {
+     "top1": [
+      0.9266,
+      0.9369
+     ],
+     "top5": [
+      0.9749,
+      0.9809
+     ],
+     "macro_top1": [
+      0.9307,
+      0.9395
+     ]
+    },
+    "note": "gallery 38826 + aug 77652 rows; early stop on cal (best epoch 9)"
+   },
+   {
+    "method": "DINO-only linear probe",
+    "source": "HeadScorer linear, refit",
+    "n": 12831,
+    "top1": 0.8875,
+    "top5": 0.9577,
+    "macro_top1": 0.8915,
+    "ci": {
+     "top1": [
+      0.881,
+      0.8936
+     ],
+     "top5": [
+      0.9539,
+      0.9614
+     ],
+     "macro_top1": [
+      0.8866,
+      0.8975
+     ]
+    },
+    "note": "gallery 38826 + aug 77652 rows; early stop on cal (best epoch 29)"
+   },
+   {
+    "method": "kNN only (both blocks)",
+    "source": "KNNScorer, state params",
+    "n": 12831,
+    "top1": 0.9161,
+    "top5": 0.9648,
+    "macro_top1": 0.9202,
+    "ci": {
+     "top1": [
+      0.9101,
+      0.922
+     ],
+     "top5": [
+      0.9613,
+      0.9681
+     ],
+     "macro_top1": [
+      0.9158,
+      0.9254
+     ]
+    },
+    "note": "gallery 38826 photos; k=10, dino_weight=0.25 (cal)"
+   },
+   {
+    "method": "Concatenated-feature linear probe (no fusion)",
+    "source": "saved L3 linear head (state probe)",
+    "n": 12831,
+    "top1": 0.9342,
+    "top5": 0.9794,
+    "macro_top1": 0.9368,
+    "ci": {
+     "top1": [
+      0.9293,
+      0.9391
+     ],
+     "top5": [
+      0.9764,
+      0.9822
+     ],
+     "macro_top1": [
+      0.9326,
+      0.9414
+     ]
+    },
+    "note": "the main model's linear head alone, no fusion / T / geo; gallery 38826 + aug 77652 rows"
+   },
+   {
+    "method": "Text prototypes only (0 images/species)",
+    "source": "TextScorer, cached BioCLIP 2 text protos",
+    "n": 12831,
+    "top1": 0.9005,
+    "top5": 0.9641,
+    "macro_top1": 0.9043,
+    "ci": {
+     "top1": [
+      0.8942,
+      0.9064
+     ],
+     "top5": [
+      0.9601,
+      0.9676
+     ],
+     "macro_top1": [
+      0.9001,
+      0.9092
+     ]
+    },
+    "note": "trait + species-name prompts; no gallery images"
+   },
+   {
+    "method": "VanaLens full, 1 photo (no geo)",
+    "source": "final.json main table: VanaLens 1 photo (no geo)",
+    "n": 12831,
+    "top1": 0.9405,
+    "top5": 0.9825,
+    "macro_top1": 0.9431,
+    "ci": {
+     "top1": [
+      0.9356,
+      0.945
+     ],
+     "top5": [
+      0.9798,
+      0.985
+     ],
+     "macro_top1": [
+      0.9394,
+      0.9474
+     ]
+    },
+    "note": "per photo"
+   },
+   {
+    "method": "VanaLens full, 1 photo + geo",
+    "source": "final.json main table: + geo prior",
+    "n": 12831,
+    "top1": 0.944,
+    "top5": 0.9846,
+    "macro_top1": 0.9469,
+    "ci": {
+     "top1": [
+      0.9396,
+      0.9483
+     ],
+     "top5": [
+      0.9822,
+      0.9871
+     ],
+     "macro_top1": [
+      0.9433,
+      0.9509
+     ]
+    },
+    "note": "per photo; 12828/12831 photos with coords"
+   },
+   {
+    "method": "VanaLens full, up to 3 photos + geo",
+    "source": "final.json main table: VanaLens up to 3 photos + geo",
+    "n": 9097,
+    "top1": 0.9603,
+    "top5": 0.9916,
+    "macro_top1": 0.9603,
+    "ci": {
+     "top1": [
+      0.9565,
+      0.9643
+     ],
+     "top5": [
+      0.9898,
+      0.9934
+     ],
+     "macro_top1": [
+      0.9566,
+      0.9638
+     ]
+    },
+    "note": "per observation; 2519/9097 observations have 2-3 photos, mean 1.41 photos"
+   }
+  ]
+ },
+ "baselines_info": {
+  "columns": [
+   "top1",
+   "top5",
+   "macro_top1"
+  ],
+  "ci": "95% percentile bootstrap over test observations (1000, seed 0), same resamples as the main table",
+  "protocol": "cached frozen embeddings; heads trained on gallery X + X_aug (as the main model), early stop on cal; kNN/text params from L3 state (cal); test only scored"
+ }
 }

@@ -59,6 +59,8 @@ def test_fit_core_writes_state_and_ablation(tmp_path, monkeypatch):
     assert state["T"] > 0 and 0 <= state["qhat"] <= 1
     assert state["text"]["missing_species"] == ["G1 s3"]
     abl = json.loads((runs / "L3" / "ablation_toy.json").read_text())
-    assert list(abl["rows"]) == ["knn", "probe", "text", "fused", "fused+T", "fused+T+sets"]
+    assert list(abl["rows"]) == ["knn", "probe", "text", "fused", "fused+T", "fused+T+sets", "mlp", "ensemble"]
+    for m in abl["rows"].values():
+        assert {"top1", "top5", "macro_top1", "nll", "ece", "coverage", "mean_set_size"} <= set(m)
     sets_row = abl["rows"]["fused+T+sets"]
     assert sets_row["top1"] > 0.8 and sets_row["coverage"] >= sets_row["top1"] and sets_row["mean_set_size"] >= 1

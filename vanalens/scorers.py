@@ -126,3 +126,149 @@ class TextScorer:
     def explain(self, x: np.ndarray, c: int, top: int = 3) -> list[str]:
         sims = (self._bio(x) @ self.protos[c].T)[0]
         return [self.trait_strings[c][i] for i in np.argsort(-sims)[:top]]
+
+
+class HeadScorer:
+    """Trained head on frozen features: linear (hidden=0) or one hidden layer MLP (ReLU + dropout).
+
+    Training uses torch (GPU if available, else CPU) with AdamW, label smoothing and optional class-balanced
+    loss weights; with a validation split it early-stops on validation top-1 (ties: lower NLL) and keeps the
+    best epoch. Inputs are multiplied by `scale` (the blocks are already L2-normalised; per-feature
+    standardisation was tried on vl600 and overfits badly: 0.56 vs 0.94 cal top-1). `weight_decay` is an explicit
+    L2 penalty sum(W**2) on the weight matrices, optimiser Adam. Inference is pure numpy, so a saved head
+    (save/load, .npz without pickle) needs no torch. Output columns are class idx 0..n_classes-1; classes with
+    no training rows still get a column (EPS floor, renormalised).
+    """
+
+    def __init__(self, n_classes: int, hidden: int = 0, dropout: float = 0.0, weight_decay: float = 1e-4,
+                 label_smoothing: float = 0.0, balanced: bool = False, lr: float = 1e-3, epochs: int = 60,
+                 batch_size: int = 1024, patience: int = 8, device: str | None = None, seed: int = 0,
+                 scale: float = 10.0):
+        self.n_classes = n_classes
+        self.scale = scale
+        self.hidden = hidden
+        self.dropout = dropout
+        self.weight_decay = weight_decay
+        self.label_smoothing = label_smoothing
+        self.balanced = balanced
+        self.lr = lr
+        self.epochs = epochs
+        self.batch_size = batch_size
+        self.patience = patience
+        self.device = device
+        self.seed = seed
+        self.params: dict[str, np.ndarray] | None = None
+        self.best_epoch = -1
+
+    def config(self) -> dict:
+        return {"hidden": self.hidden, "dropout": self.dropout, "weight_decay": self.weight_decay,
+                "label_smoothing": self.label_smoothing, "balanced": self.balanced, "lr": self.lr,
+                "epochs": self.epochs, "batch_size": self.batch_size, "patience": self.patience, "scale": self.scale,
+                "best_epoch": self.best_epoch}
+
+    def fit(self, X: np.ndarray, y: np.ndarray, X_val: np.ndarray | None = None,
+            y_val: np.ndarray | None = None) -> "HeadScorer":
+        import torch
+
+        dev = self.device or ("cuda" if torch.cuda.is_available() else "cpu")
+        g = torch.Generator().manual_seed(self.seed)
+        torch.manual_seed(self.seed)
+        X = np.asarray(X, dtype=np.float32)
+        y = np.asarray(y, dtype=np.int64)
+        mu = np.zeros(X.shape[1], dtype=np.float32)
+        sd = np.full(X.shape[1], 1.0 / self.scale, dtype=np.float32)
+        Xt = torch.from_numpy((X - mu) / sd).to(dev)
+        yt = torch.from_numpy(y).to(dev)
+        D, C = X.shape[1], self.n_classes
+        if self.hidden > 0:
+            net = torch.nn.Sequential(torch.nn.Dropout(min(self.dropout, 0.2)), torch.nn.Linear(D, self.hidden),
+                                      torch.nn.ReLU(), torch.nn.Dropout(self.dropout),
+                                      torch.nn.Linear(self.hidden, C))
+        else:
+            net = torch.nn.Sequential(torch.nn.Linear(D, C))
+        net = net.to(dev)
+        cw = None
+        if self.balanced:
+            cnt = np.bincount(y, minlength=C).astype(np.float64)
+            w = np.where(cnt > 0, cnt.sum() / np.maximum(cnt, 1) / max((cnt > 0).sum(), 1), 0.0)
+            cw = torch.tensor(w, dtype=torch.float32, device=dev)
+        loss_fn = torch.nn.CrossEntropyLoss(weight=cw, label_smoothing=self.label_smoothing)
+        opt = torch.optim.Adam(net.parameters(), lr=self.lr)
+        mats = [m.weight for m in net if isinstance(m, torch.nn.Linear)]
+        has_val = X_val is not None and y_val is not None
+        if has_val:
+            Xv = torch.from_numpy((np.asarray(X_val, dtype=np.float32) - mu) / sd).to(dev)
+            yv = np.asarray(y_val, dtype=np.int64)
+        best_key, best_state, bad = None, None, 0
+        n = len(y)
+        for ep in range(self.epochs):
+            net.train()
+            perm = torch.randperm(n, generator=g).to(dev)
+            for i in range(0, n, self.batch_size):
+                idx = perm[i:i + self.batch_size]
+                opt.zero_grad(set_to_none=True)
+                loss = loss_fn(net(Xt[idx]), yt[idx])
+                if self.weight_decay > 0:
+                    loss = loss + self.weight_decay * sum((W ** 2).sum() for W in mats)
+                loss.backward()
+                opt.step()
+            if not has_val:
+                continue
+            net.eval()
+            with torch.no_grad():
+                logp = torch.cat([torch.log_softmax(net(Xv[i:i + 8192]), 1) for i in range(0, len(yv), 8192)])
+            logp = logp.cpu().numpy()
+            key = (-float((logp.argmax(1) == yv).mean()), float(-logp[np.arange(len(yv)), yv].mean()))
+            if best_key is None or key < best_key:
+                best_key, bad, self.best_epoch = key, 0, ep
+                best_state = {k: v.detach().cpu().clone() for k, v in net.state_dict().items()}
+            else:
+                bad += 1
+                if bad >= self.patience:
+                    break
+        if best_state is not None:
+            net.load_state_dict(best_state)
+        else:
+            self.best_epoch = self.epochs - 1
+        sdict = {k: v.detach().cpu().numpy() for k, v in net.state_dict().items()}
+        lin = [k[:-len(".weight")] for k in sdict if k.endswith(".weight")]
+        self.params = {"mu": mu, "sd": sd.astype(np.float32)}
+        for j, k in enumerate(lin):
+            self.params[f"W{j}"] = sdict[f"{k}.weight"].T.copy()
+            self.params[f"b{j}"] = sdict[f"{k}.bias"].copy()
+        return self
+
+    def logits(self, X: np.ndarray) -> np.ndarray:
+        if self.params is None:
+            raise RuntimeError("call fit() or load() first")
+        p = self.params
+        H = (np.atleast_2d(np.asarray(X, dtype=np.float32)) - p["mu"]) / p["sd"]
+        H = H @ p["W0"] + p["b0"]
+        if "W1" in p:
+            H = np.maximum(H, 0.0) @ p["W1"] + p["b1"]
+        return H.astype(np.float64)
+
+    def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        Z = self.logits(X)
+        E = np.exp(Z - Z.max(1, keepdims=True))
+        P = E / E.sum(1, keepdims=True) + EPS
+        return P / P.sum(1, keepdims=True)
+
+    def save(self, path) -> None:
+        import json
+
+        if self.params is None:
+            raise RuntimeError("nothing to save")
+        np.savez(path, config_json=json.dumps(self.config() | {"n_classes": self.n_classes}), **self.params)
+
+    @classmethod
+    def load(cls, path) -> "HeadScorer":
+        import json
+
+        d = np.load(path, allow_pickle=False)
+        cfg = json.loads(str(d["config_json"]))
+        best = cfg.pop("best_epoch", -1)
+        h = cls(**cfg)
+        h.best_epoch = best
+        h.params = {k: d[k] for k in d.files if k != "config_json"}
+        return h

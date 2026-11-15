@@ -1,0 +1,187 @@
+{
+ "alpha": 0.1,
+ "columns": [
+  "n",
+  "top1",
+  "top5",
+  "macro_top1",
+  "coverage",
+  "mean_set_size"
+ ],
+ "datasets": {
+  "inat_india": [
+   {
+    "method": "B0 PlantNet API",
+    "source": "runs/L1/b0_inat_india.json",
+    "status": "not run",
+    "note": "no result file",
+    "n": null,
+    "top1": null,
+    "top5": null,
+    "macro_top1": null,
+    "coverage": null,
+    "mean_set_size": null
+   },
+   {
+    "method": "B1 BioCLIP zero-shot",
+    "source": "runs/L2/b1_inat_india.json",
+    "status": "not run",
+    "note": "no result file",
+    "n": null,
+    "top1": null,
+    "top5": null,
+    "macro_top1": null,
+    "coverage": null,
+    "mean_set_size": null
+   },
+   {
+    "method": "B2 BioCLIP 2 kNN",
+    "source": "runs/L2/b2_inat_india.json",
+    "status": "ok",
+    "note": "",
+    "n": 558,
+    "top1": 0.9355,
+    "top5": 0.991,
+    "macro_top1": 0.9278,
+    "coverage": null,
+    "mean_set_size": null
+   },
+   {
+    "method": "B3 linear probe",
+    "source": "runs/L3/ablation_inat_india.json#probe",
+    "status": "ok",
+    "note": "",
+    "n": 558,
+    "top1": 0.9211,
+    "top5": 0.9875,
+    "macro_top1": 0.9057,
+    "coverage": null,
+    "mean_set_size": null
+   },
+   {
+    "method": "B4 VLM",
+    "source": "runs/L4/b4_inat_india.json",
+    "status": "not run",
+    "note": "VANALENS_LLM_KEY is empty: reranker and B4 disabled",
+    "n": null,
+    "top1": null,
+    "top5": null,
+    "macro_top1": null,
+    "coverage": null,
+    "mean_set_size": null
+   },
+   {
+    "method": "knn",
+    "source": "runs/L3/ablation_inat_india.json#knn",
+    "status": "ok",
+    "note": "",
+    "n": 558,
+    "top1": 0.8118,
+    "top5": 0.9427,
+    "macro_top1": 0.7956,
+    "coverage": null,
+    "mean_set_size": null
+   },
+   {
+    "method": "probe",
+    "source": "runs/L3/ablation_inat_india.json#probe",
+    "status": "ok",
+    "note": "",
+    "n": 558,
+    "top1": 0.9211,
+    "top5": 0.9875,
+    "macro_top1": 0.9057,
+    "coverage": null,
+    "mean_set_size": null
+   },
+   {
+    "method": "text",
+    "source": "runs/L3/ablation_inat_india.json#text",
+    "status": "ok",
+    "note": "",
+    "n": 558,
+    "top1": 0.4982,
+    "top5": 0.991,
+    "macro_top1": 0.4844,
+    "coverage": null,
+    "mean_set_size": null
+   },
+   {
+    "method": "fused",
+    "source": "runs/L3/ablation_inat_india.json#fused",
+    "status": "ok",
+    "note": "",
+    "n": 558,
+    "top1": 0.9534,
+    "top5": 0.9946,
+    "macro_top1": 0.9418,
+    "coverage": null,
+    "mean_set_size": null
+   },
+   {
+    "method": "fused+T",
+    "source": "runs/L3/ablation_inat_india.json#fused+T",
+    "status": "ok",
+    "note": "",
+    "n": 558,
+    "top1": 0.9534,
+    "top5": 0.9946,
+    "macro_top1": 0.9418,
+    "coverage": null,
+    "mean_set_size": null
+   },
+   {
+    "method": "fused+T+sets",
+    "source": "runs/L3/ablation_inat_india.json#fused+T+sets",
+    "status": "ok",
+    "note": "",
+    "n": 558,
+    "top1": 0.9534,
+    "top5": 0.9946,
+    "macro_top1": 0.9418,
+    "coverage": 0.9534,
+    "mean_set_size": 1.0
+   },
+   {
+    "method": "fused+T+sets (rerun)",
+    "source": "VanaLens.predict, cached emb, beta=0",
+    "status": "ok",
+    "note": "current cache (text protos rebuilt after L3 ablation); baseline for the geo step",
+    "n": 558,
+    "top1": 0.957,
+    "top5": 0.9964,
+    "macro_top1": 0.9452,
+    "coverage": 0.957,
+    "mean_set_size": 1.0
+   },
+   {
+    "method": "+ geo prior",
+    "source": "VanaLens.predict, cached emb, beta=0.25",
+    "status": "ok",
+    "note": "558/558 photos with coords",
+    "n": 558,
+    "top1": 0.957,
+    "top5": 0.9964,
+    "macro_top1": 0.9433,
+    "coverage": 0.957,
+    "mean_set_size": 1.0
+   },
+   {
+    "method": "+ reranker",
+    "source": "VanaLens.predict",
+    "status": "not run",
+    "note": "VANALENS_LLM_KEY not set",
+    "n": null,
+    "top1": null,
+    "top5": null,
+    "macro_top1": null,
+    "coverage": null,
+    "mean_set_size": null
+   }
+  ]
+ },
+ "skipped_datasets": [
+  "dimpsar",
+  "campus"
+ ]
+}

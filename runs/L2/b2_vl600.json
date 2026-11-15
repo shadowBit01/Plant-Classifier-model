@@ -1,0 +1,21 @@
+{
+  "n": 12831,
+  "top1": 0.873,
+  "top5": 0.9537,
+  "macro_top1": 0.8775,
+  "ece": 0.0117,
+  "genus_top1": 0.8931,
+  "family_top1": 0.9195,
+  "tol_top1": 0.6158,
+  "tol_top5": 0.7848,
+  "open_ended_top1": 0.6158,
+  "open_ended_top5": 0.7848,
+  "tree_of_life": {
+    "top1": 0.6158,
+    "top5": 0.7848
+  },
+  "dataset": "vl600",
+  "baseline": "B2",
+  "elapsed_sec": 177.72,
+  "timestamp": "2026-11-15T12:49:50.256123+00:00"
+}

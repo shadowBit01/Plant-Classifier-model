@@ -18,7 +18,7 @@ Implementation notes (L6-a)
 - Heads (L6-c): the probe is HeadScorer.load(state["probe"]["weights"]) (L3-c torch head, pure-numpy inference);
   only when that file is missing is the sklearn probe refitted on the gallery from state["probe"]["C"].
   If state["final"] == "ensemble" (and the ensemble block is kept), the ensemble scorers / weights / T / qhat are
-  used and its "mlp" head is HeadScorer.load(state["heads"]["mlp"]["weights"]).
+  used and each head is HeadScorer.load(state["heads"][name]["weights"]) ("probe" = linear, "mlp").
 - Text scorer is skipped when CACHE_DIR/text/<dataset>.npz is missing; reranker when VANALENS_LLM_KEY is empty.
 - Geo prior is applied ONCE after the multi-photo combination (step 5 before step 4), so k photos of one plant
   do not apply the prior k times. The combination is the MEAN of the calibrated log-probabilities (L6-c), so an
@@ -106,7 +106,7 @@ class VanaLens:
         self.heads: dict = {}
         for n in cfg["scorers"]:
             if n in HEADS and float(cfg["weights"].get(n, 0)) != 0:
-                self.heads[n] = self._load_head(n, state, gallery)
+                self.heads[n] = self._load_head(n, state, gallery, self.config_name == "ensemble")
         self.probe = self.heads.get("probe")
         self.text: TextScorer | None = None
         if text is not None:
@@ -116,7 +116,7 @@ class VanaLens:
         self.names = [n for n in cfg["scorers"] if (n != "text" or self.text is not None) and w.get(n, 0) != 0]
         if not self.names:                     # only the (missing) text scorer had weight
             self.names = ["probe"]
-            self.heads["probe"] = self.probe = self._load_head("probe", state, gallery)
+            self.heads["probe"] = self.probe = self._load_head("probe", state, gallery, False)
         self.weights = [float(w.get(n, 1.0)) for n in self.names]
         self.T = float(cfg["T"])
         self.qhat = float(cfg["qhat"])
@@ -130,9 +130,15 @@ class VanaLens:
         self._organ_protos: np.ndarray | None = None
         self._prior_cache: dict[tuple[float, float], np.ndarray | None] = {}
 
-    def _load_head(self, name: str, state: dict, gallery: EmbeddingSet):
-        """Saved L3-c head (HeadScorer .npz) if its file exists, else (probe only) the sklearn probe refit."""
-        info = state.get("probe", {}) if name == "probe" else (state.get("heads") or {}).get(name, {})
+    def _load_head(self, name: str, state: dict, gallery: EmbeddingSet, ensemble: bool):
+        """Saved L3-c head (HeadScorer .npz) if its file exists, else (probe only) the sklearn probe refit.
+        Fused config: "probe" is state["probe"] (L3's default head, linear or MLP). Ensemble config: each scorer
+        name is its own head, state["heads"][name] (so "probe" is the linear head even when the default is MLP)."""
+        heads = state.get("heads") or {}
+        if name == "probe" and not (ensemble and "probe" in heads):
+            info = state.get("probe", {})
+        else:
+            info = heads.get(name, {})
         path = info.get("weights")
         if path and Path(path).exists():
             head = HeadScorer.load(path)

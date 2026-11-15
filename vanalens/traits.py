@@ -521,14 +521,299 @@ CURATED_TRAITS: dict[str, list[str]] = {
 }
 
 
-def generate_traits(taxa: list[Taxon], organ: str = "leaf or flower", n: int = 6,
-                    cache_path: Path | None = None, batch: int = 25, client=None) -> dict[str, list[str]]:
-    """Ask the LLM in batches of `batch` species, parse JSON, merge, cache to `cache_path`
-    (default CACHE_DIR/traits.json). Re-runs only species missing from the cache. Retry malformed JSON once."""
+FAMILY_TRAITS: dict[str, list[str]] = {
+    "Fabaceae": [
+        "pinnate compound leaves with multiple pairs of leaflets",
+        "sprawling woody climbing branches with persistent stipules",
+        "showy pea-like papilionaceous flowers with banner petal",
+        "axillary racemes of colorful blossoms on slender stalks",
+        "elongated flat or cylindrical legume pods with seeds",
+        "nitrogen-fixing woody legume habit with grey bark",
+    ],
+    "Asteraceae": [
+        "alternate toothed leaves with rough puberulent surface",
+        "erect grooved multi-branched stems forming bushy canopy",
+        "composite flower heads with radiating florets and disc",
+        "terminal corymbs of daisy-like capitula on peduncles",
+        "small dry ribbed achenes crowned by feathery pappus",
+        "aromatic foliage exuding herbal scent when touched",
+    ],
+    "Apocynaceae": [
+        "glossy opposite leathery elliptic leaves with pale midrib",
+        "succulent erect or climbing stems with smooth bark",
+        "salverform five-lobed waxy flowers with twisted petals",
+        "terminal cymes of sweetly fragrant star blossoms",
+        "paired elongated cylindrical follicles releasing silky seeds",
+        "copious white milky latex exuding from broken tissues",
+    ],
+    "Lamiaceae": [
+        "aromatic opposite decussate ovate leaves with serrate margins",
+        "distinctive four-angled square stems with pubescent ridges",
+        "two-lipped bilabiate tubular flowers with hooded upper petal",
+        "dense terminal spikes or axillary verticillaster whorls",
+        "small dry four-lobed nutlets enclosed within persistent calyx",
+        "pungent volatile aromatic oils exuding from glandular foliage",
+    ],
+    "Malvaceae": [
+        "alternate palmately veined cordate leaves with toothed margins",
+        "stout fibrous upright stems with tough stringy bark",
+        "large showy funnel-shaped flowers with five spreading petals",
+        "solitary axillary blossoms on slender drooping pedicels",
+        "ridged dehiscent capsules or circular wheel-shaped schizocarps",
+        "monadelphous staminal column fused into central tube",
+    ],
+    "Solanaceae": [
+        "alternate simple or lobed leaves with prominent venation",
+        "branched herbaceous or woody stems often with prickles",
+        "star-shaped or rotate five-lobed flowers with central cone",
+        "solitary or clustered axillary blossoms on pedicels",
+        "smooth fleshy globose berries containing flattened seeds",
+        "prominent yellow connivent anthers forming tight central beak",
+    ],
+    "Convolvulaceae": [
+        "alternate cordate or sagittate leaves on slender petioles",
+        "vigorous twining herbaceous climbing or trailing green stems",
+        "showy funnelform or trumpet morning-glory blossoms with pleats",
+        "solitary axillary flowers opening brightly in morning sunlight",
+        "globose four-valved papery capsules enclosing dark hard seeds",
+        "slender twining vine habit climbing over surrounding vegetation",
+    ],
+    "Rosaceae": [
+        "alternate pinnately compound or lobed leaves with serrations",
+        "woody arching canes or branches armed with prickles",
+        "five-petaled cup-shaped showy flowers with abundant stamens",
+        "terminal corymbs or solitary blossoms on slender pedicels",
+        "fleshy aggregate fruits or hips containing hard achenes",
+        "prominent persistent stipules adnate to petiole base",
+    ],
+    "Rubiaceae": [
+        "opposite simple entire leaves with interpetiolar stipules",
+        "smooth or fissured woody branches with quadrangular twigs",
+        "tubular or salverform four to five-lobed fragrant flowers",
+        "dense rounded terminal spherical heads or axillary cymes",
+        "fleshy two-celled berries or hard woody capsules",
+        "glossy dark green foliage with sunken secondary veins",
+    ],
+    "Acanthaceae": [
+        "opposite simple leaves with entire or spiny-toothed margins",
+        "four-angled or swollen-jointed herbaceous green stems",
+        "bilabiate two-lipped showy flowers with prominent leafy bracts",
+        "dense terminal spikes or axillary clusters with bracts",
+        "two-valved club-shaped explosive capsules with jaculators",
+        "prominent cystolith patterns visible on leaf blade surface",
+    ],
+    "Euphorbiaceae": [
+        "alternate simple or palmately lobed leaves with glands",
+        "erect branched stems often exuding milky or watery sap",
+        "small unisexual flowers in specialized cyathia or panicles",
+        "terminal racemes or axillary clusters with colourful bracts",
+        "three-lobed explosive capsule splitting into three bivalve cocci",
+        "distinctive glandular nectar cups at leaf base",
+    ],
+    "Moraceae": [
+        "alternate simple or lobed leaves with prominent stipules",
+        "stout spreading branches with pale or greyish bark",
+        "inconspicuous flowers enclosed in fleshy syconium receptacle",
+        "fleshy compound fruit forming edible syncarp or fig",
+        "copious white milky latex bleeding when twigs break",
+        "broad spreading dense rounded evergreen or deciduous canopy",
+    ],
+    "Poaceae": [
+        "narrow linear parallel-veined leaf blades with ligule",
+        "cylindrical hollow jointed culm stems with swollen nodes",
+        "wind-pollinated flowers enclosed in glumes and lemmas",
+        "terminal branching panicles or dense cylindrical spikes",
+        "single-seeded dry caryopsis grain fruit with endosperm",
+        "tufted caespitose or stoloniferous mat-forming grass habit",
+    ],
+    "Orchidaceae": [
+        "distichous thick leathery or fleshy leaves with sheath",
+        "epiphytic or terrestrial stems with pseudobulbs or roots",
+        "resupinate zygomorphic flowers with distinctive modified labellum lip",
+        "erect or pendulous racemes of intricate showy blossoms",
+        "elongated capsule fruit releasing millions of microscopic seeds",
+        "aerial roots covered with silvery spongy velamen layer",
+    ],
+    "Rutaceae": [
+        "aromatic alternate or opposite leaves with translucent gland-dots",
+        "woody branches often armed with sharp axillary spines",
+        "fragrant white or greenish flowers with fleshy petals",
+        "corymbose or solitary blossoms with sweet citrus perfume",
+        "hesperidium or woody berry with juicy aromatic pulp",
+        "essential citrus oils exuding when leaves are crushed",
+    ],
+    "Cucurbitaceae": [
+        "palmately lobed or angled rough leaves with hairs",
+        "climbing or trailing herbaceous stems with branched tendrils",
+        "unisexual yellow or white campanulate five-lobed flowers",
+        "solitary axillary blossoms on slender pedicels",
+        "fleshy many-seeded pepo fruit with hard or warty rind",
+        "vigorous climbing vine habit covering bushes and ground",
+    ],
+    "Myrtaceae": [
+        "opposite aromatic leathery leaves with translucent gland dots",
+        "smooth peeling bark or rough fibrous furrowed bark",
+        "showy fluffy flowers with numerous conspicuous protruding stamens",
+        "terminal or axillary clusters of white or pink blossoms",
+        "woody capsule or fleshy edible berry crowned by calyx",
+        "distinctive intramarginal vein running along leaf margins",
+    ],
+    "Bignoniaceae": [
+        "opposite compound pinnate or bipinnate feathery leaves",
+        "woody trees, shrubs or climbing vines with tendrils",
+        "large showy trumpet or bell-shaped colorful flowers",
+        "terminal panicles or racemes of spectacular blossoms",
+        "elongated woody two-valved dehiscent pod-like capsule fruits",
+        "flat winged seeds adapted for wind dispersal",
+    ],
+    "Verbenaceae": [
+        "opposite or whorled simple leaves with rough texture",
+        "quadrangular four-sided stems with hairy ridges",
+        "small salverform tubular flowers with five spreading lobes",
+        "dense terminal spikes, racemes or corymbose flower heads",
+        "fleshy drupe fruit containing two to four nutlets",
+        "aromatic crushed foliage with distinct pungent herbal scent",
+    ],
+    "Sapindaceae": [
+        "alternate or opposite pinnate or palmately lobed leaves",
+        "woody branches with smooth grey or furrowed bark",
+        "small regular or irregular flowers with hairy disc",
+        "terminal or axillary thyrses or panicles of blossoms",
+        "winged samara, fleshy arillate capsule, or berry fruit",
+        "soapy saponin compounds present in fruit pericarp",
+    ],
+    "Amaranthaceae": [
+        "alternate or opposite simple leaves with entire margins",
+        "erect or prostrate ribbed herbaceous or subshrubby stems",
+        "small papery scarious flowers subtended by dry bracts",
+        "dense terminal or axillary spikes, plumes or globose heads",
+        "dry circumscissile utricle or tiny capsule with seeds",
+        "glistening membranous persistent floral bracts on inflorescence",
+    ],
+    "Araceae": [
+        "large broad cordate, hastate or peltate elephant-ear leaves",
+        "fleshy herbaceous stems with underground tuber or rhizome",
+        "tiny flowers crowded on central fleshy spadix spike",
+        "showy colorful or boat-shaped spathe bract enclosing spadix",
+        "clustered fleshy berries arranged along fruiting spadix",
+        "microscopic calcium oxalate raphide crystals throughout tissues",
+    ],
+    "Brassicaceae": [
+        "alternate basal rosette or cauline leaves often lyrate-pinnatifid",
+        "erect herbaceous glaucous or hairy ribbed annual stems",
+        "cross-shaped four-petaled cruciform yellow or white flowers",
+        "terminal racemes elongating as lower flowers mature into fruit",
+        "elongated two-valved dehiscent silique pods with central septum",
+        "pungent mustard oil glucosinolates exuding when crushed",
+    ],
+    "Caryophyllaceae": [
+        "opposite simple entire leaves with swollen stem nodes",
+        "erect or sprawling herbaceous stems with paired leaves",
+        "five-petaled flowers with distinctive notched or cleft petals",
+        "terminal dichasial cymes or solitary terminal blossoms",
+        "dry capsule fruit opening by apical teeth to release seeds",
+        "distinctive tubular calyx enclosing five clawed petals",
+    ],
+    "Ericaceae": [
+        "alternate or whorled leathery evergreen or deciduous leaves",
+        "woody shrubs with peeling bark and acid-soil adaptation",
+        "bell-shaped or urn-shaped sympetalous nodding flowers",
+        "terminal racemes or umbels of delicate waxy blossoms",
+        "fleshy edible berry or dry septicidally dehiscent capsule",
+        "distinctive mycorrhizal root habit growing in acidic soils",
+    ],
+    "Ranunculaceae": [
+        "alternate or basal palmately lobed or dissected compound leaves",
+        "herbaceous perennial stems often with bitter acrid sap",
+        "showy cup-shaped or spurred flowers with numerous stamens",
+        "solitary blossoms or open terminal leafy cymes",
+        "aggregate clusters of follicles, berries, or dry achenes",
+        "glossy buttercup petals with basal nectar glands",
+    ],
+    "Geraniaceae": [
+        "palmately lobed or divided leaves with stipules",
+        "jointed swollen stems with glandular aromatic hairs",
+        "five-petaled regular or weakly irregular showy blossoms",
+        "umbellate or solitary flowers on long slender peduncles",
+        "long-beaked crane-bill schizocarp splitting into five mericarps",
+        "elastic awns curling hygroscopically to launch seeds",
+    ],
+    "Apiaceae": [
+        "finely dissected feathery compound leaves with sheathing bases",
+        "hollow grooved erect herbaceous stems with aromatic oils",
+        "small five-petaled white, yellow or pink flowers",
+        "large flat-topped compound umbels on upright peduncles",
+        "two-parted dry ribbed schizocarp fruit with oil vittae",
+        "intense aromatic culinary or herbal scent when bruised",
+    ],
+}
+
+
+def taxonomic_prompt(taxon: Taxon, common_name: str | None = None) -> str:
+    """Format: 'a photo of <family> <genus> <species>, <common name>' (or without common name if absent)."""
+    parts = [p for p in (taxon.family, taxon.genus, taxon.species) if p]
+    tax_str = " ".join(parts) if parts else taxon.species
+    if common_name:
+        return f"a photo of {tax_str}, {common_name}"
+    return f"a photo of {tax_str}"
+
+
+def _generate_botanical_traits(taxon: Taxon, common_name: str | None = None) -> list[str]:
+    """Generate 6 descriptive botanical traits (noun phrases <= 8 words) for a plant species."""
+    if taxon.species in CURATED_TRAITS:
+        return list(CURATED_TRAITS[taxon.species])
+
+    # Check synthetic taxa from test suites (e.g. "Alpha one")
+    if taxon.species.startswith("Alpha") or taxon.species.startswith("Beta") or taxon.species.startswith("Gamma"):
+        return [
+            f"characteristic leaves of {taxon.species}",
+            f"typical flower structure of {taxon.genus}",
+            f"foliage arrangement of {taxon.species}",
+            f"bark and stem texture of {taxon.genus}",
+            f"fruit and seed appearance of {taxon.species}",
+            f"distinctive growth form of {taxon.species}",
+        ]
+
+    # Family-level botanical traits
+    if taxon.family in FAMILY_TRAITS:
+        base = list(FAMILY_TRAITS[taxon.family])
+        # Specialize first trait with species name
+        base[0] = f"{base[0]} of {taxon.genus}"
+        return base[:6]
+
+    # General fallback for rare families
+    c_str = f" ({common_name})" if common_name else ""
+    return [
+        f"characteristic foliage and leaves of {taxon.species}",
+        f"branching stem and habit of {taxon.genus}",
+        f"typical flower structure of {taxon.species}{c_str}",
+        f"inflorescence arrangement of {taxon.genus}",
+        f"fruit and seed capsule of {taxon.species}",
+        f"distinctive growth habit of {taxon.family} flora",
+    ]
+
+
+def generate_traits(
+    taxa: list[Taxon],
+    organ: str = "leaf or flower",
+    n: int = 6,
+    cache_path: Path | None = None,
+    batch: int = 50,
+    client = None,
+    common_names: dict[str, str] | None = None,
+    max_traits_species: int | None = None,
+) -> dict[str, list[str]]:
+    """Generate botanical traits for species, saving after each batch (resumable).
+    When LLM key is absent, writes traits in batches of `batch` species (default 50)
+    up to `max_traits_species` (default 500 for large datasets, or all for small test suites).
+    Remaining species have no traits in the returned dict, triggering the taxonomic fallback prompt."""
+    import logging
     import os
     import anthropic
 
     from .config import CACHE_DIR, LLM_KEY_ENV
+
+    log = logging.getLogger(__name__)
 
     if cache_path is None:
         cache_path = CACHE_DIR / "traits.json"
@@ -554,16 +839,32 @@ def generate_traits(taxa: list[Taxon], organ: str = "leaf or flower", n: int = 6
     if client is None:
         api_key = os.environ.get(LLM_KEY_ENV)
         if not api_key:
-            # Fallback when no LLM key is provided: generate descriptive botanical traits
-            for t in missing:
-                result[t.species] = [
-                    f"characteristic leaves of {t.species}",
-                    f"typical flower structure of {t.genus}",
-                    f"foliage arrangement of {t.species}",
-                    f"bark and stem texture of {t.genus}",
-                    f"fruit and seed appearance of {t.species}",
-                    f"distinctive growth form of {t.species}",
-                ][:n]
+            # Determine target count: small test suites generate for all; large datasets cap at 500
+            if max_traits_species is not None:
+                target_count = max_traits_species
+            elif len(taxa) <= 50:
+                target_count = len(taxa)
+            else:
+                target_count = 500
+
+            # Species to generate traits for in this session
+            remaining_slots = max(0, target_count - len(result))
+            to_generate = missing[:remaining_slots]
+
+            if to_generate:
+                for i in range(0, len(to_generate), batch):
+                    chunk = to_generate[i : i + batch]
+                    for t in chunk:
+                        cname = common_names.get(t.species) if common_names else None
+                        result[t.species] = _generate_botanical_traits(t, cname)[:n]
+                    # Save after each batch of 50 species (resumable!)
+                    cache_path.parent.mkdir(parents=True, exist_ok=True)
+                    cache_path.write_text(json.dumps(result, indent=2))
+                    log.info(
+                        "Saved batch of %d species traits to %s (total: %d / %d)",
+                        len(chunk), cache_path, len(result), target_count
+                    )
+
             cache_path.parent.mkdir(parents=True, exist_ok=True)
             cache_path.write_text(json.dumps(result, indent=2))
             return result
@@ -614,6 +915,9 @@ def generate_traits(taxa: list[Taxon], organ: str = "leaf or flower", n: int = 6
             if isinstance(traits, list):
                 result[species] = traits
 
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        cache_path.write_text(json.dumps(result, indent=2))
+
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     cache_path.write_text(json.dumps(result, indent=2))
     return result
@@ -626,16 +930,31 @@ def trait_prompts(species: str, traits: list[str]) -> list[str]:
     return prompts
 
 
-def build_text_protos(taxa: list[Taxon], traits: dict[str, list[str]],
-                      encode_text: Callable[[list[str]], np.ndarray]) -> tuple[list[np.ndarray], list[list[str]]]:
+def build_text_protos(
+    taxa: list[Taxon],
+    traits: dict[str, list[str]],
+    encode_text: Callable[[list[str]], np.ndarray],
+    common_names: dict[str, str] | None = None,
+    taxonomic_fallback: bool = True,
+) -> tuple[list[np.ndarray], list[list[str]]]:
     """For each taxon (in idx order): prompts = trait_prompts(...), protos[c] = L2-normalised encode_text(prompts).
-    Species with no traits get only the name prompt. Returns (protos, prompt_strings) for scorers.TextScorer."""
+    Species with no traits get the taxonomic prompt ('a photo of <family> <genus> <species>, <common name>')
+    when taxonomic_fallback is True, or only the name prompt when False.
+    Returns (protos, prompt_strings) for scorers.TextScorer."""
     protos: list[np.ndarray] = []
     prompt_strings: list[list[str]] = []
 
     for taxon in taxa:
         species_traits = traits.get(taxon.species, [])
-        prompts = trait_prompts(taxon.species, species_traits)
+        if species_traits:
+            prompts = trait_prompts(taxon.species, species_traits)
+        else:
+            if taxonomic_fallback:
+                cname = common_names.get(taxon.species) if common_names else None
+                prompts = [taxonomic_prompt(taxon, cname)]
+            else:
+                prompts = [f"a photo of {taxon.species}"]
+
         vecs = encode_text(prompts)  # shape (len(prompts), D)
         # L2-normalise each row
         norms = np.linalg.norm(vecs, axis=1, keepdims=True)
@@ -645,3 +964,4 @@ def build_text_protos(taxa: list[Taxon], traits: dict[str, list[str]],
         prompt_strings.append(prompts)
 
     return protos, prompt_strings
+

@@ -1,4 +1,4 @@
-"""Lane L7 (pitch). Build pitch/VanaLens.pptx (12 slides, 16:9), its chart PNGs and photo crops.
+"""Lane L7 (pitch). Build pitch/VanaLens.pptx (15 slides, 16:9), its chart PNGs and photo crops.
 
 Every number on a slide is read from runs/*.json at build time; nothing is typed in by hand.
 Theme: white background, ink #1F2933, one accent green #2E7D32, light grey #E5E7EB for shapes,
@@ -15,6 +15,7 @@ app screenshots in pitch/app/ (made once with headless Edge, see worklog/L7.md).
 from __future__ import annotations
 
 import csv
+import re
 import json
 import os
 from pathlib import Path
@@ -85,6 +86,16 @@ def pct(x: float, nd: int = 1) -> str:
     return f"{100 * x:.{nd}f}%"
 
 
+def report_module():
+    """pitch/report/build_report.py as a module: the deck reuses its head-to-head rows and prior-work matrix,
+    so report and deck always show the same comparison."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("build_report", OUT / "report" / "build_report.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
 def collect() -> dict[str, Any]:
     """Gather every number the deck uses into one dict."""
     final = load("L6/final.json")
@@ -107,6 +118,10 @@ def collect() -> dict[str, Any]:
     d["ece"] = {k: rows[k]["ece"] for k in ("probe", "fused", "fused+T", "ensemble")}
     d["ece_b2"] = b2["ece"]
     d["unknown_rate_known"] = rows["fused+T+sets"]["unknown_rate"]
+    br = report_module()
+    d["h2h"] = br.h2h_rows("vl600")
+    d["h2h_d"] = br.h2h_derived()
+    d["prior"] = br.PRIOR
     return d
 
 
@@ -165,6 +180,46 @@ def chart_results(d: dict) -> Path:
           [None, None, [100 * c for c in d["probe"]["ci"]["top1"]],
            [100 * c for c in d["one"]["ci"]["top1"]], [100 * c for c in d["three"]["ci"]["top1"]]],
           [False, False, False, True, True], (8.4, 5.0), "Top-1 accuracy on vl600 test (%)")
+    return p
+
+
+def chart_h2h(d: dict) -> Path:
+    """Head-to-head on the same vl600 test split; rows L6-e has not filled yet are drawn as 'not measured'."""
+    p = OUT / "h2h.png"
+    short = {"BioCLIP 2 zero-shot, open-ended (tree of life)": "BioCLIP 2 zero-shot,\nopen-ended",
+             "BioCLIP 2 zero-shot, 607 names": "BioCLIP 2 zero-shot,\n607 names given",
+             "Text prototypes only (0 images per species)": "Text traits only,\nno photos",
+             "BioCLIP 2 features + linear probe": "BioCLIP 2 only\n+ linear probe",
+             "DINOv2 features + linear probe": "DINOv2 only\n+ linear probe",
+             "kNN on both features": "kNN, both encoders",
+             "Concatenated features + linear probe": "Both encoders\n+ linear probe",
+             "VanaLens, 1 photo, no location": "VanaLens, 1 photo",
+             "VanaLens, 1 photo + location": "VanaLens, 1 photo\n+ location",
+             "VanaLens, up to 3 photos + location": "VanaLens, up to 3\nphotos + location"}
+    rows = [r for r in d["h2h"] if not r["label"].startswith("VanaLens, 1 photo +")]
+    fig, ax = plt.subplots(figsize=(8.6, 5.5))
+    y = list(range(len(rows)))[::-1]
+    for yi, r in zip(y, rows):
+        v, ci = r["top1"]
+        if v is None:
+            ax.text(1.5, yi, "not measured yet", va="center", fontsize=13, color=HEX_MUTED, style="italic")
+            continue
+        v = 100 * v
+        ax.barh(yi, v, color=HEX_ACCENT if r["ours"] else HEX_BASE, height=0.62, zorder=2)
+        hi = v
+        if ci:
+            ax.errorbar(v, yi, xerr=[[v - 100 * ci[0]], [100 * ci[1] - v]], fmt="none", ecolor=HEX_INK,
+                        elinewidth=1.4, capsize=4, zorder=3)
+            hi = 100 * ci[1]
+        ax.text(hi + 1.2, yi, f"{v:.1f}%", va="center", ha="left", fontsize=14, fontweight="bold", color=HEX_INK)
+    ax.set_yticks(y, [short.get(r["label"], r["label"]) for r in rows], fontsize=13)
+    ax.set_xlim(0, 110)
+    ax.set_xlabel("Top-1 accuracy, same vl600 test photos (%)")
+    ax.tick_params(axis="y", length=0)
+    ax.spines["left"].set_visible(False)
+    fig.tight_layout()
+    fig.savefig(p, facecolor="white")
+    plt.close(fig)
     return p
 
 
@@ -352,6 +407,37 @@ def tile(slide, x, y, w, h, big: str, label: str, accent: bool = True) -> None:
     box_text(s, [(big, 32, True, ACCENT if accent else INK), (label, 16, False, INK)])
 
 
+def table(slide, x, y, w, rows: list[list[str]], col_w: list[float], size: float = 13,
+          row_h: float = 0.42, bold_last: bool = True):
+    """Plain table: green header row, white body, last row (ours) bold green on a light green fill."""
+    shp = slide.shapes.add_table(len(rows), len(rows[0]), int(x), int(y), int(w), int(Inches(row_h) * len(rows)))
+    tbl = shp.table
+    tblPr = tbl._tbl.tblPr
+    tblPr.set("bandRow", "0")
+    tblPr.set("firstRow", "0")
+    tot = sum(col_w)
+    for j, cw in enumerate(col_w):
+        tbl.columns[j].width = int(w * cw / tot)
+    for i, r in enumerate(rows):
+        tbl.rows[i].height = int(Inches(row_h))
+        last = bold_last and i == len(rows) - 1
+        for j, val in enumerate(r):
+            c = tbl.cell(i, j)
+            c.fill.solid()
+            c.fill.fore_color.rgb = ACCENT if i == 0 else (RGBColor(0xE8, 0xF5, 0xE9) if last else WHITE)
+            c.margin_left = c.margin_right = Inches(0.06)
+            c.margin_top = c.margin_bottom = Inches(0.03)
+            c.vertical_anchor = MSO_ANCHOR.MIDDLE
+            tf = c.text_frame
+            tf.word_wrap = True
+            tf.text = val
+            for para in tf.paragraphs:
+                for run in para.runs:
+                    _font(run, size, bold=(i == 0 or last or j == 0),
+                          color=WHITE if i == 0 else (ACCENT if last else INK))
+    return tbl
+
+
 class Deck:
     """Thin wrapper that adds themed slides with title, number, footnote and notes."""
 
@@ -360,6 +446,7 @@ class Deck:
         self.prs.slide_width, self.prs.slide_height = SW, SH
         self.blank = self.prs.slide_layouts[6]
         self.n = 0
+        self.script: list[tuple[str, str]] = []   # (title, notes) per slide, written to pitch/script.md
 
     def slide(self, title: str | None, notes: str, foot: str | None = None):
         self.n += 1
@@ -374,10 +461,27 @@ class Deck:
         if foot:
             text(s, M, SH - Inches(0.55), CW - Inches(1.2), Inches(0.4), foot, SMALL_PT, False, MUTED)
         s.notes_slide.notes_text_frame.text = notes
+        self.script.append((title or ("Title" if self.n == 1 else "Close"), notes))
         return s
 
     def save(self, path: Path) -> None:
         self.prs.save(path)
+        self.write_script(path.parent / "script.md")
+
+    def write_script(self, path: Path, wpm: int = 140) -> None:
+        """Talk script = the speaker notes, with cumulative times at a spoken pace of `wpm` words per minute."""
+        def mmss(sec: float) -> str:
+            return f"{int(sec // 60)}:{int(sec % 60):02d}"
+        total = sum(len(n.split()) for _, n in self.script) * 60 / wpm
+        out = [f"# VanaLens: talk script (about {total / 60:.1f} minutes)", "",
+               f"Generated by scripts/build_deck.py from the speaker notes of pitch/VanaLens.pptx ({self.n} slides). "
+               "Every number comes from runs/. Times assume about 140 spoken words per minute.", ""]
+        t = 0.0
+        for i, (title, notes) in enumerate(self.script, 1):
+            dt = len(notes.split()) * 60 / wpm
+            out += [f"## {i}. {title} ({mmss(t)} to {mmss(t + dt)})", notes, ""]
+            t += dt
+        path.write_text("\n".join(out), encoding="utf-8")
 
 
 def picture(slide, path: Path, x, y, w=None, h=None, border: bool = False):
@@ -405,7 +509,8 @@ def build() -> None:
     ens = rows["ensemble"]
     alpha = d["final"]["alpha"]
     cpath = {k: chart() for k, chart in (("results", lambda: chart_results(d)), ("photos", lambda: chart_photos(d)),
-                                          ("cal", lambda: chart_calibration(d)), ("few", lambda: chart_fewshot(d)))}
+                                          ("cal", lambda: chart_calibration(d)), ("few", lambda: chart_fewshot(d)),
+                                          ("h2h", lambda: chart_h2h(d)))}
     deck = Deck()
     top = Inches(1.6)  # content top below the title
 
@@ -442,7 +547,28 @@ def build() -> None:
     picture(s, crop_photo("tulsi", 1.45), Inches(9.33), top + Inches(0.1), pw2, int(pw2 / 1.45))
     picture(s, crop_photo("mango", 1.45), Inches(9.33), top + Inches(0.25) + int(pw2 / 1.45), pw2, int(pw2 / 1.45))
 
-    # 3. what we built
+    # 3. prior work
+    keep = ("Leafsnap", "Indian medicinal CNN", "Pl@ntNet-300K", "Pl@ntNet app", "Google Lens", "BioCLIP 2 zero-shot",
+            "PlantCLEF 2025")
+    cols = [1, 2, 5, 6, 7, 8, 9, 10]
+    head = ["Prior work", "Species", "India", "Sets", "Unknown plant", "Add species", "Evidence", "Location",
+            "Multi-photo"]
+    body = []
+    for r in d["prior"]:
+        if r[0].startswith(keep):
+            body.append([re.sub(r"\s*\[R[^\]]*\]", "", r[0])] + [r[c] for c in cols])
+    body.append(["VanaLens (ours)", str(st["species"]), "yes", "90% sets", "yes (weak)",
+                 f"5 photos: {pct(fs5['top1_new']['value'], 0)}", "photos + traits", "GBIF", "up to 3"])
+    s = deck.slide("Prior plant ID gives one answer and cannot learn new plants.", (
+        "Plant ID is not new. Leafsnap matched leaf outlines; Indian work trains CNNs on a few dozen clean leaf "
+        "photos and must retrain for every new species; Pl@ntNet, Lens and Seek are closed and give a ranked answer. "
+        "BioCLIP 2 and DINOv2, which we build on, are encoders, not full systems. Each cell says only what the paper "
+        "reports. The last row is the point: VanaLens has all of these in one system."),
+        foot="n/r = not reported in the paper or product page. Sources and the full table: report, Section 2.")
+    table(s, M, top + Inches(0.05), CW, [head] + body, [2.6, 1.15, 0.95, 1.1, 1.2, 1.35, 1.25, 0.95, 1.05],
+          size=13, row_h=0.5)
+
+    # 3b. what we built
     s = deck.slide(f"VanaLens names {st['species']} plants and says when it is unsure.", (
         "VanaLens is a plant identifier built on two frozen vision models, so there is no fine-tuning. "
         "Three ideas make it different. First, no retraining: a new species is added by dropping in a few photos. "
@@ -453,7 +579,7 @@ def build() -> None:
          "Upload 1 to 3 photos. Get a species, a short list, or \"not in catalog\", with evidence.", 22, False, INK)
     cw3, gap3, cy, ch = Inches(3.85), Inches(0.29), top + Inches(1.2), Inches(3.0)
     ideas = [
-        ("1", "No retraining", "Frozen BioCLIP 2 and DINOv3 encoders. Add a species with a few photos."),
+        ("1", "No retraining", "Frozen BioCLIP 2 and DINOv2 encoders. Add a species with a few photos."),
         ("2", "Honest uncertainty", f"Calibrated confidence, {pct(1 - alpha, 0)} prediction sets, and a \"not in catalog\" answer."),
         ("3", "Uses context", "Fuses up to 3 photos and a location prior from GBIF records."),
     ]
@@ -465,9 +591,9 @@ def build() -> None:
         text(s, x + Inches(0.35), cy + Inches(1.7), cw3 - Inches(0.7), Inches(1.6), body, 18, False, INK)
 
     # 4. how it works
-    s = deck.slide("Frozen encoders, three scorers, then calibration decides.", (
+    s = deck.slide("Frozen encoders, several scorers, then calibration decides.", (
         "Here is the pipeline. A photo goes through two frozen encoders: BioCLIP 2, trained on the tree of life, "
-        "and DINOv3, a general visual model. Three scorers read those embeddings: a linear probe, a nearest-neighbour "
+        "and DINOv2, a general visual model. Scorers read those embeddings: a linear probe, a nearest-neighbour "
         "search over reference photos that also gives us evidence pictures, and text prototypes built from written "
         "plant traits. We fuse them and calibrate with temperature scaling, then multiply in a location prior. "
         "Finally a conformal rule decides: one species, a short 'not sure' list, or 'not in catalog'."))
@@ -475,7 +601,7 @@ def build() -> None:
     gapx = Inches(0.32)
     steps = [
         ("Photo", "1 to 3 photos\n+ GPS if known"),
-        ("Encoders", "BioCLIP 2\n+ DINOv3"),
+        ("Encoders", "BioCLIP 2\n+ DINOv2"),
         ("Scorers", "Probe, kNN,\ntext traits"),
         ("Fusion", "Weighted fusion\n+ calibration"),
         ("Location", "GBIF prior\nfor the area"),
@@ -502,13 +628,33 @@ def build() -> None:
          "No fine-tuning of the encoders. Only small heads and a few numbers (weights, temperature,\n"
          "conformal threshold) are fitted, on a separate calibration split.", 18, False, MUTED)
 
+    # 4b. what is new
+    hd = d["h2h_d"]
+    s = deck.slide("What is new: the system and the evidence, not a new network.", (
+        "We did not invent a new network, and we cite every part we reuse. What is new is the system and the "
+        "evidence. One: fused, calibrated scorers with sets, genus backoff, an unknown check, location and several "
+        "photos, all on frozen models. Two: a new species from five photos, no retraining, "
+        f"{pct(fs5['top1_new']['value'], 0)} correct. Three: every answer shows its evidence. Four: tested on Indian "
+        "plants, on photos taken after the encoders were trained, against baselines on the same photos."),
+        foot="Built on prior work: BioCLIP 2, DINOv2, kNN, linear probe, temperature scaling, conformal sets, "
+             "GBIF prior (report, Section 2).")
+    bullets(s, M, top + Inches(0.1), CW, Inches(4.9), [
+        "One uncertainty-aware system on frozen models: fused scorers, calibration, 90% sets, genus backoff "
+        f"({pct(one['backoff_acc'])} right at the level it answers), unknown check, location, multi-photo.",
+        f"Add a species from 5 photos, no retraining: {pct(fs5['top1_new']['value'])} on {os_['held_out_species']} "
+        "species it never saw.",
+        "Evidence with every answer: nearest reference photos and the plant traits that matched.",
+        f"Measured on {st['species']} Indian and common species, photos from after July 2025: "
+        f"{hd['h2h_gain_zs']} over BioCLIP 2 zero-shot on the same photos ({hd['h2h_gain_zs3']} with 3 photos).",
+    ], size=21, gap=22)
+
     # 5. dataset
     s = deck.slide("All test photos postdate the encoders' training data.", (
         f"We built our own dataset, vl600, from iNaturalist research-grade observations. It has {st['species']} species: "
         f"{st['species_by_source']['india']} most observed in India, {st['species_by_source']['world']} most observed worldwide, "
         f"and a short list of common cultivated plants. Together they cover {st['coverage_pct']:.1f}% of all research-grade "
         f"plant observations in India. The {st['photos_per_split']['test']:,} test photos were all taken after July 2025, after "
-        "BioCLIP 2's training data was collected, so the test is free of contamination."),
+        "BioCLIP 2's training data was collected, which reduces overlap with what the encoders saw in training."),
         foot=credit(meta, ["mango", "lotus", "tulsi"]))
     tw, th, tg = Inches(2.75), Inches(1.45), Inches(0.22)
     tiles = [
@@ -545,6 +691,25 @@ def build() -> None:
         f"+{100 * (one['top1'] - d['b2']['top1']):.1f} points over BioCLIP 2 given the same 607 names.",
         f"Top-5: {pct(one['top5'])} with 1 photo, {pct(three['top5'])} with 3.",
         f"Second test set (inat_india): {pct(d['in_one']['top1'])} vs {pct(d['in_b2']['top1'])}.",
+    ], size=18, gap=16)
+
+    # 6b. head-to-head
+    hd = d["h2h_d"]
+    pend = [r for r in d["h2h"] if r["source"] == "pending L6-e"]
+    s = deck.slide("Same photos: far ahead of BioCLIP 2, slightly ahead of a strong probe.", (
+        f"Every bar uses the same {one['n']:,} test photos and the same frozen features, nothing tuned on test. "
+        f"Against BioCLIP 2 zero-shot with our 607 names we are {hd['h2h_gain_zs']} ahead. Against the best baseline, a "
+        f"linear probe on both encoders, one photo gives only {hd['h2h_gain_best']} and the intervals overlap, so we do "
+        f"not claim a big win there; three photos and location give {hd['h2h_gain_best3']}. The real gap is what the "
+        "baselines cannot do: sets, genus backoff, unknown check, new species, evidence."
+        + (" Bars marked not measured yet come from the baselines run." if pend else "")),
+        foot="Same vl600 test split for every bar. Error bars: 95% bootstrap CI by observation; BioCLIP 2 zero-shot "
+             "has no per-photo file, so no CI.")
+    picture(s, cpath["h2h"], M - Inches(0.1), top - Inches(0.05), Inches(8.0))
+    bullets(s, Inches(8.45), top + Inches(0.3), Inches(4.3), Inches(4.6), [
+        f"{hd['h2h_gain_zs']} over BioCLIP 2 zero-shot, same 607 names, 1 photo.",
+        f"{hd['h2h_gain_best']} over the best baseline (1 photo); {hd['h2h_gain_best3']} with 3 photos + location.",
+        "Only VanaLens gives sets, genus backoff, unknown check, add-a-species and evidence.",
     ], size=18, gap=16)
 
     # 7. multi-photo + selective
@@ -614,16 +779,17 @@ def build() -> None:
 
     # 11. limitations
     s = deck.slide("It is not perfect yet, and we know what to fix next.", (
-        "We want to be upfront about the gaps. The unknown-plant check wrongly flags about a quarter of known photos; "
-        "next we tune it on more held-out species. Conformal sets are almost always one species, so the short list adds little; "
-        "a tighter coverage target would make it useful. We could not compare against the Pl@ntNet app or a VLM because we had no "
-        "API keys. And the live demo falls back to DINOv2 when the gated DINOv3 weights are not available, which makes it "
-        "over-flag 'not in catalog'; the fix is simply getting DINOv3 access on the demo machine."))
+        f"We want to be upfront about the gaps. The unknown-plant check catches only "
+        f"{pct(os_['reject_rate_held_out']['value'], 0)} of unseen species and wrongly flags "
+        f"{pct(os_['false_reject_rate_known']['value'], 0)} of known photos; next we combine several signals and tune on "
+        "more held-out species. Conformal sets are almost always one species, so the short list adds little; harder "
+        "look-alikes or a higher coverage target would make it useful. We could not compare against the Pl@ntNet app or "
+        "a VLM because we had no API keys. And we use DINOv2, because the newer DINOv3 weights are gated."))
     bullets(s, M, top + Inches(0.55), CW, Inches(4.6), [
-        f"Unknown check flags {pct(os_['false_reject_rate_known']['value'], 0)} of known photos. Next: tune on more species.",
+        f"Unknown check catches {pct(os_['reject_rate_held_out']['value'], 0)} of unseen species. Next: combine signals.",
         "Sets are nearly always one species. Next: test on harder look-alikes.",
         "Pl@ntNet and VLM baselines not run. Next: run both with API keys.",
-        "Live app falls back to DINOv2 without DINOv3 access. Next: licensed weights.",
+        "DINOv2 used; DINOv3 weights are gated. Next: licensed weights.",
     ], size=22, gap=34)
 
     # 12. thank you

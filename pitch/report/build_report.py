@@ -279,6 +279,7 @@ def derived() -> dict[str, str]:
     d["ens_weights"] = ", ".join(f"{k} {v:g}" for k, v in ens.items()) or NM
     fw = dig(ab, "state.weights") or {}
     d["fused_weights"] = ", ".join(f"{k} {v:g}" for k, v in fw.items()) or NM
+    d.update(h2h_derived())
     return d
 
 
@@ -456,7 +457,240 @@ def t_dataset() -> str:
     return "\n".join(out)
 
 
+# ------------------------------------------------------------------ related work + head-to-head (L7-e)
+# Head-to-head rows on OUR vl600 test split. Source order: the "baselines" block that L6-e adds to
+# runs/L6/final.json (matched by keywords, schema-tolerant), else an existing row of final.json, else n/m.
+# (label, keywords that identify the L6-e entry, fallback final.json method, is_vanalens)
+H2H = [
+    ("BioCLIP 2 zero-shot, open-ended (tree of life)", ("open-ended", "open_ended", "tree of life", "tol"), "@tol", False),
+    ("BioCLIP 2 zero-shot, 607 names", ("zero-shot", "zero_shot", "zeroshot", "b2"), "B2 BioCLIP 2 kNN", False),
+    ("Text prototypes only (0 images per species)", ("text",), "text", False),
+    ("BioCLIP 2 features + linear probe", ("bioclip-only", "bioclip only", "bioclip_only", "bioclip probe",
+                                           "bioclip_probe", "bioclip"), None, False),
+    ("DINOv2 features + linear probe", ("dinov2-only", "dino-only", "dino only", "dino_only", "dino probe",
+                                        "dino_probe", "dino"), None, False),
+    ("kNN on both features", ("knn",), "knn", False),
+    ("Concatenated features + linear probe", ("concat", "both blocks", "probe"), "probe", False),
+    ("VanaLens, 1 photo, no location", ("no geo",), "VanaLens 1 photo (no geo)", True),
+    ("VanaLens, 1 photo + location", ("1 photo", "1photo", "one photo", "single"), "+ geo prior", True),
+    ("VanaLens, up to 3 photos + location", ("3 photo", "3photo", "three photo", "multi"),
+     "VanaLens up to 3 photos + geo", True),
+]
+
+
+def _bl_entries(ds: str) -> list[dict]:
+    """L6-e baselines for one dataset as a list of dicts with a 'name' key, whatever the block's exact layout."""
+    b = (J("L6/final.json") or {}).get("baselines")
+    if b is None:
+        return []
+    if isinstance(b, dict) and ds in b:
+        b = b[ds]                      # {dataset: [...] or {name: {...}}}
+    elif isinstance(b, dict) and any(k in b for k in ("vl600", "inat_india")):
+        return []                      # keyed by dataset, but not this one
+    out = []
+    if isinstance(b, dict):
+        b = [dict(v, name=k) if isinstance(v, dict) else {"name": k, "top1": v} for k, v in b.items()]
+    for e in b if isinstance(b, list) else []:
+        if not isinstance(e, dict) or e.get("dataset", ds) != ds:
+            continue
+        e = dict(e)
+        e["name"] = str(e.get("name") or e.get("method") or e.get("baseline") or e.get("id") or "")
+        out.append(e)
+    return out
+
+
+def _bl_find(ds: str, keys: tuple[str, ...], used: set[int]) -> dict | None:
+    """First unused L6-e entry whose name contains a keyword, trying keywords in order (most specific first)."""
+    ents = _bl_entries(ds)
+    for k in keys:
+        for i, e in enumerate(ents):
+            if i not in used and k in e["name"].lower():
+                used.add(i)
+                return e
+    return None
+
+
+def _metric(e: dict, col: str) -> tuple[float | None, list | None]:
+    """(value, ci) for col from an entry that stores either {col: v, ci: {col: [lo, hi]}} or {col: {value, ci}}."""
+    v = e.get(col)
+    if isinstance(v, dict):
+        return v.get("value"), v.get("ci") if isinstance(v.get("ci"), list) else None
+    ci = (e.get("ci") or {}).get(col) if isinstance(e.get("ci"), dict) else None
+    ci = ci or e.get(f"{col}_ci")
+    return v, ci if isinstance(ci, list) and len(ci) == 2 else None
+
+
+def h2h_rows(ds: str = "vl600") -> list[dict]:
+    """Head-to-head rows: label, top1/top5/macro (value, ci), source, is_vanalens."""
+    used: set[int] = set()
+    rows = []
+    b2 = J(f"L2/b2_{ds}.json") or {}
+    for label, keys, fb, ours in H2H:
+        e = None if ours else _bl_find(ds, keys, used)   # VanaLens rows: always the main table (L6-e copies them)
+        r = {"label": label, "ours": ours}
+        if e is not None:
+            for c in ("top1", "top5", "macro_top1"):
+                r[c] = _metric(e, c)
+            r["source"] = "L6-e"
+        elif fb == "@tol":
+            r.update(top1=(b2.get("tol_top1"), None), top5=(b2.get("tol_top5"), None), macro_top1=(None, None),
+                     source="runs/L2/b2")
+        elif fb is not None and frow(ds, fb) is not None and frow(ds, fb).get("status") == "ok":
+            for c in ("top1", "top5", "macro_top1"):
+                r[c] = (rv(ds, fb, c), rci(ds, fb, c))
+            r["source"] = "runs/L2/b2" if fb.startswith("B2") else "final.json"
+        else:
+            r.update(top1=(None, None), top5=(None, None), macro_top1=(None, None), source="pending L6-e")
+        rows.append(r)
+    return rows
+
+
+def h2h_derived() -> dict[str, str]:
+    """Gain of VanaLens (1 photo + location) over BioCLIP 2 zero-shot and over the best baseline row."""
+    rows = h2h_rows()
+    ours = next(r for r in rows if r["label"].startswith("VanaLens, 1 photo, no"))   # same inputs as baselines
+    ours_geo = next(r for r in rows if r["label"].startswith("VanaLens, 1 photo +"))
+    ours3 = next(r for r in rows if r["label"].startswith("VanaLens, up to 3"))
+    zs = next(r for r in rows if r["label"].startswith("BioCLIP 2 zero-shot, 607"))
+    base = [r for r in rows if not r["ours"] and r["top1"][0] is not None]
+    best = max(base, key=lambda r: r["top1"][0]) if base else None
+    d: dict[str, str] = {}
+
+    def gain(a, b) -> str:
+        p = points(a["top1"][0], b["top1"][0])
+        return NM if p is None else f"{p:+.1f} points"
+
+    d["h2h_gain_zs"] = gain(zs, ours)
+    d["h2h_gain_zs3"] = gain(zs, ours3)
+    d["h2h_gain_zs_geo"] = gain(zs, ours_geo)
+    d["h2h_gain_best_geo"] = gain(best, ours_geo) if best else NM
+    d["h2h_best"] = best["label"].lower() if best else NM
+    d["h2h_best_top1"] = pct_ci(*best["top1"]) if best else NM
+    d["h2h_gain_best"] = gain(best, ours) if best else NM
+    d["h2h_gain_best3"] = gain(best, ours3) if best else NM
+    sep = NM
+    if best and best["top1"][1] and ours["top1"][1]:
+        sep = ("the two 95% intervals do not overlap" if best["top1"][1][1] < ours["top1"][1][0]
+               else "the two 95% intervals overlap, so this single-photo gain alone is not statistically clear")
+    elif best:
+        sep = "the baseline has no interval, so only the VanaLens interval is shown"
+    d["h2h_sep"] = sep
+    pend = [r["label"] for r in rows if r["source"] == "pending L6-e"]
+    d["h2h_pending"] = ("Rows marked n/m (" + "; ".join(pend) + ") are filled by the baselines run (card L6-e) "
+                        "and appear on the next rebuild." if pend else
+                        "All rows are measured.")
+    d["h2h_l6e"] = "yes" if any(r["source"] == "L6-e" for r in rows) else "no"
+    return d
+
+
+def t_h2h() -> str:
+    out = ["Table: Head-to-head on the same vl600 test split (12,831 photos, observed on or after 1 July 2025). "
+           "Every row uses the same frozen embeddings, gallery and calibration photos; nothing is tuned on test. "
+           "Single photo unless noted. Top-1, top-5 and macro top-1 in %, 95% bootstrap CI over observations in "
+           "brackets (BioCLIP 2 zero-shot: point value, no per-photo predictions stored).", "",
+           "| Method | Images per species used | Top-1 | Top-5 | Macro top-1 | Source |", "|---|---|---|---|---|---|"]
+    imgs = {"BioCLIP 2 zero-shot, open-ended (tree of life)": "0 (whole tree of life)",
+            "BioCLIP 2 zero-shot, 607 names": "0 (names only)",
+            "Text prototypes only (0 images per species)": "0 (names + traits)"}
+    src = {"L6-e": "baselines run", "final.json": "main run", "runs/L2/b2": "B2 run", "pending L6-e": "pending"}
+    for r in h2h_rows():
+        lab = f"**{r['label']}**" if r["ours"] else r["label"]
+        cells = " | ".join(cell(*r[c]) for c in ("top1", "top5", "macro_top1"))
+        out.append(f"| {lab} | {imgs.get(r['label'], 'gallery photos')} | {cells} | {src[r['source']]} |")
+    return "\n".join(out)
+
+
+def t_caps() -> str:
+    """Capabilities the baselines do not have, measured on vl600 test."""
+    fin = J("L6/final.json")
+    ab = (J("L3/ablation_vl600.json") or {}).get("rows") or {}
+    b2 = J("L2/b2_vl600.json") or {}
+    fs = {r["shots"]: r for r in dig(fin, "extras.vl600.few_shot") or []}
+    ss = rv("vl600", "+ geo prior", "mean_set_size")
+    out = ["Table: Capabilities beyond top-1, vl600 test. A dash means the method has no such output.", "",
+           "| Capability | BioCLIP 2 zero-shot | Linear probe (concat) | kNN | VanaLens |", "|---|---|---|---|---|",
+           f"| Calibration error ECE (lower is better) | {cell(b2.get('ece'))} | {cell(dig(ab, 'probe.ece'))} | "
+           f"{cell(dig(ab, 'knn.ece'))} | {cell(dig(ab, 'ensemble.ece'))} |",
+           f"| 90% conformal set: coverage / mean size | - | - | - | {cell(rv('vl600', '+ geo prior', 'coverage'))} / "
+           f"{'n/m' if ss is None else f'{ss:.2f}'} |",
+           f"| Answer at genus or family when unsure: accuracy at reported rank | - | - | - | "
+           f"{cell(rv('vl600', '+ geo prior', 'backoff_acc'), rci('vl600', '+ geo prior', 'backoff_acc'))} |",
+           f"| Open-set \"not in catalogue\" AUROC (61 unseen species) | - | - | - | "
+           f"{cell(dig(fin, 'extras.vl600.open_set.auroc'))} |",
+           f"| New species from 5 photos, no retraining: top-1 on 61 new species | names only, not measured | "
+           f"needs retraining | not measured | {cell((fs.get(5) or {}).get('top1_new'))} |",
+           f"| Multi-photo fusion (up to 3 photos): top-1 | - | - | - | "
+           f"{cell(rv('vl600', 'VanaLens up to 3 photos + geo', 'top1'), rci('vl600', 'VanaLens up to 3 photos + geo', 'top1'))} |",
+           "| Evidence shown with the answer | - | - | nearest photos | nearest photos + matched traits |",
+           "| Uses location | - | - | - | GBIF prior |"]
+    return "\n".join(out)
+
+
+# Capability matrix of prior work. Only what each paper (or product page) states; "n/r" = not reported.
+PRIOR = [
+    # name, species, India, field photos, calibrated, sets, rejects unknown, add w/o retraining, evidence, location, multi-photo
+    ("Leafsnap [R1]", "184 trees", "no (US)", "leaf, plain bg", "n/r", "ranked list", "non-leaf only", "n/r", "n/r",
+     "n/r", "n/r"),
+    ("Pl@ntNet-300K models [R2]", "1,081", "n/r", "yes", "n/r", "set metrics", "no", "retrain", "no", "no", "no"),
+    ("Indian medicinal CNN [R3]", "6", "yes", "n/r", "n/r", "no", "no", "retrain", "no", "no", "no"),
+    ("DIMPSAR, MED117, HerbLife [R4-R6]", "40-117", "yes", "DIMPSAR yes; MED117 no", "(data)", "(data)", "(data)",
+     "(data)", "(data)", "(data)", "(data)"),
+    ("Pl@ntNet app [R7]", "n/r", "n/r", "yes", "n/r", "ranked list", "n/r", "n/r", "n/r", "n/r", "n/r"),
+    ("Google Lens, Seek", "n/r", "n/r", "yes", "n/r", "n/r", "n/r", "vendor", "n/r", "n/r", "n/r"),
+    ("BioCLIP 2 zero-shot [R9]", "952K taxa (train)", "n/r", "yes", "n/r", "no", "no", "by name", "no", "no", "no"),
+    ("PlantCLEF 2025 DINOv2 + head [R13]", "7,806", "no (Europe)", "quadrats", "n/r", "multi-label", "no", "no", "no",
+     "no", "tiles"),
+    ("VLMs in VLM4Bio [R14]", "no plants", "no", "yes", "n/r", "no", "no", "by name", "no", "no", "no"),
+    ("Geo priors, SINR [R18, R19]", "part", "-", "-", "-", "-", "-", "-", "-", "yes", "-"),
+    ("Conformal for plant ID [R16, R17]", "part", "-", "yes", "-", "yes", "no", "-", "-", "-", "yes"),
+]
+PRIOR_COLS = ["Species", "India", "Field photos", "Calibrated", "Sets", "Rejects unknown", "Add species, no retrain",
+              "Evidence", "Location", "Multi-photo"]
+
+
+def t_prior() -> str:
+    fin = J("L6/final.json")
+    fs5 = next((r for r in dig(fin, "extras.vl600.few_shot") or [] if r.get("shots") == 5), {})
+    ece = dig(J("L3/ablation_vl600.json"), "rows.ensemble.ece")
+    auc = val(dig(fin, "extras.vl600.open_set.auroc"))
+    ours = ("**VanaLens (ours)**", "607", "yes", "yes", f"yes, ECE {pct(ece)}", "90% conformal",
+            f"weak, AUROC {pct(auc)}", f"{pct(val(fs5.get('top1_new')))} from 5 photos", "photos + traits",
+            "GBIF prior", "up to 3")
+    out = ["Table: Prior work against VanaLens [[compact]]. Cells state only what each paper or product page reports. "
+           "n/r = not reported; (data) = dataset paper, no model; part = a component, not a full system; - = not "
+           "applicable; bg = background. Codes in brackets point to the related-work references.", "", "| System | " + " | ".join(PRIOR_COLS) + " |", "|" + "---|" * (len(PRIOR_COLS) + 1)]
+    for r in PRIOR + [ours]:
+        out.append("| " + " | ".join(r) + " |")
+    return "\n".join(out)
+
+
+# Accuracies as reported by their authors, each on its own dataset. Never mixed with our numbers.
+REPORTED = [
+    ("Pl@ntNet-300K ViT-B (fine-tuned), repo README [R2]", "Pl@ntNet-300K test, 1,081 species", "top-1", "84.6%"),
+    ("MobileNet, Kavitha et al. 2024 [R3]", "6 Indian medicinal species, 500 images each (Kaggle)", "accuracy", "98.3%"),
+    ("Multi-organ CNN, Rzanny et al. 2019 [R8]", "101 species, 5 fixed views per plant",
+     "top-1", "77% whole plant; 88% flower front; 97% all views fused"),
+    ("BioCLIP 2, Gu et al. 2025 [R9]", "its zero-shot species benchmarks", "gain over BioCLIP", "+18.0 points"),
+    ("GPT-4V in VLM4Bio, Maruf et al. 2024 [R14]", "Bird-10K species", "open-ended / multiple choice",
+     "17.4% / 82.6% (BioCLIP open: 67.1%)"),
+    ("DS@GT, frozen DINOv2 + tiling, 2nd in PlantCLEF 2025 [R13]", "PlantCLEF 2025 quadrats, multi-label",
+     "macro F1 per quadrat (private)", "0.348"),
+    ("DIMPSAR, MED117, HerbLife [R4-R6]", "dataset papers", "-", "no accuracy reported"),
+]
+
+
+def t_reported() -> str:
+    out = ["Table: Accuracies reported by prior work, each on its own dataset and protocol. These numbers are NOT "
+           "comparable with each other or with ours; they show the range of settings in the literature. Our numbers "
+           "on our test split are in Table H2H.", "",
+           "| Work | Dataset (theirs) | Metric | Reported |", "|---|---|---|---|"]
+    for r in REPORTED:
+        out.append("| " + " | ".join(r) + " |")
+    return "\n".join(out)
+
+
 TABLES = {
+    "prior": t_prior, "reported": t_reported, "h2h": t_h2h, "caps": t_caps,
     "main_vl600": lambda: t_main("vl600"), "main_inat": lambda: t_main("inat_india"),
     "ablation_vl600": lambda: t_ablation("vl600"), "ablation_inat": lambda: t_ablation("inat_india"),
     "uncertainty": t_uncertainty, "openset": t_openset, "fewshot": t_fewshot, "target": t_target,
@@ -545,6 +779,13 @@ def fig_accuracy(path: Path) -> None:
           "Top-1 accuracy on vl600 test (%)", xmax=108, target=95)
 
 
+def fig_h2h(path: Path) -> None:
+    """Head-to-head top-1 on vl600 test with 95% CI error bars (baselines grey, VanaLens green)."""
+    rows = h2h_rows()
+    hbars(path, [r["label"] for r in rows], [r["top1"][0] for r in rows], [r["top1"][1] for r in rows],
+          [r["ours"] for r in rows], "Top-1 accuracy on the same vl600 test split (%)", xmax=108, target=95)
+
+
 def fig_calibration(path: Path) -> None:
     rows = (J("L3/ablation_vl600.json") or {}).get("rows") or {}
     b2 = J("L2/b2_vl600.json") or {}
@@ -616,6 +857,7 @@ def figures() -> dict[str, tuple[str, str]]:
     setup_mpl()
     fig_pipeline(FIGS / "pipeline.png")
     fig_accuracy(FIGS / "accuracy.png")
+    fig_h2h(FIGS / "h2h.png")
     fig_calibration(FIGS / "calibration.png")
     fig_fewshot(FIGS / "fewshot.png")
     credit = fig_photos(FIGS / "photos.jpg")
@@ -624,6 +866,10 @@ def figures() -> dict[str, tuple[str, str]]:
                      "split (heads, fusion weights, temperature, conformal threshold); no encoder is fine-tuned."),
         "accuracy": ("figs/accuracy.png", "Top-1 accuracy on the vl600 test split (post-cutoff observations). Error bars: "
                      "95% bootstrap CI over observations (baselines have point values only). Dashed line: the 95% target."),
+        "h2h": ("figs/h2h.png", "Head-to-head on the same vl600 test split: BioCLIP 2 zero-shot, single-scorer and "
+                "single-encoder baselines (grey) against VanaLens (green). Error bars: 95% bootstrap CI over "
+                "observations; rows without bars have no per-photo predictions. Rows marked not measured are filled "
+                "by the baselines run. Dashed line: the 95% target."),
         "calibration": ("figs/calibration.png", "Calibration error before and after temperature scaling (vl600 test)."),
         "fewshot": ("figs/fewshot.png", "Accuracy on species added after training, by number of photos added. "
                     "Shaded: 95% CI. No weights are retrained."),
@@ -763,7 +1009,9 @@ def md_to_html(md: str) -> str:
                 rows.append([c.strip() for c in lines[i].strip().strip("|").split("|")])
                 i += 1
             tab_no += 1
-            h = ["<table>"]
+            compact = "[[compact]]" in cap
+            cap = cap.replace(" [[compact]]", "").replace("[[compact]]", "")
+            h = ["<table class='compact'>" if compact else "<table>"]
             if cap:
                 h.append(f"<caption><b>Table {tab_no}.</b> {inline(cap)}</caption>")
             if rows:
@@ -836,6 +1084,7 @@ thead th { border-top: 1.4px solid #1e4d22; border-bottom: 1px solid #1e4d22; te
   background: #f1f7f1; }
 td { border-bottom: 0.5px solid #d9dfd9; padding: 2.5pt 4pt; vertical-align: top; }
 tbody tr:last-child td { border-bottom: 1.4px solid #1e4d22; }
+table.compact { font-size: 7.4pt; } table.compact td, table.compact th { padding: 1.8pt 3pt; }
 .ci { color: #5f6b62; font-size: 7.8pt; white-space: nowrap; }
 .note { border-left: 3px solid #2e7d32; background: #f3f8f3; padding: 5pt 8pt; margin: 6pt 0 9pt; font-size: 9.8pt; }
 .pb { break-after: page; }
@@ -853,7 +1102,9 @@ def resolve_table_refs(body: str) -> str:
         order.append((int(m.group(1)), m.group(2)))
     keys = {"DATASET": "two evaluation datasets", "MAINVL": "Test results on vl600", "MAININ": "Test results on inat_india",
             "ABLVL": "Ablation on vl600", "ABLIN": "Ablation on inat_india", "UNC": "Uncertainty outputs",
-            "OPENSET": "Open-set test", "FEWSHOT": "Adding species", "TARGET": "Which headline"}
+            "OPENSET": "Open-set test", "FEWSHOT": "Adding species", "TARGET": "Which headline",
+            "PRIOR": "Prior work against", "REPORTED": "Accuracies reported", "H2H": "Head-to-head",
+            "CAPS": "Capabilities beyond"}
     for k, start in keys.items():
         n = next((no for no, cap in order if cap.startswith(start) or start in cap), None)
         body = body.replace(f"Table {k}", f"Table {n}" if n else "a table below")

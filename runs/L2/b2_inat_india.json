@@ -1,0 +1,21 @@
+{
+  "n": 558,
+  "top1": 0.9355,
+  "top5": 0.991,
+  "macro_top1": 0.9278,
+  "ece": 0.0196,
+  "genus_top1": 0.9409,
+  "family_top1": 0.9427,
+  "tol_top1": 0.7043,
+  "tol_top5": 0.8351,
+  "open_ended_top1": 0.7043,
+  "open_ended_top5": 0.8351,
+  "tree_of_life": {
+    "top1": 0.7043,
+    "top5": 0.8351
+  },
+  "dataset": "inat_india",
+  "baseline": "B2",
+  "elapsed_sec": 80.13,
+  "timestamp": "2026-11-15T01:10:35.501069+00:00"
+}

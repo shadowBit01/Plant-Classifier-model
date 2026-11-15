@@ -5,7 +5,7 @@ Predict flow (VanaLens.predict):
   2 X = encoder.embed_paths(paths)                 (one row per photo)
   3 P = fusion.fuse([knn, probe, text], weights)   then fusion.apply_temperature(P, T)
   4 if lat/lon: P = geo.apply_prior(P, geo.geo_prior(gbif_species_counts(...), taxa), beta)
-  5 multi-photo: p = softmax(sum over photos of log P)
+  5 multi-photo (up to MAX_PHOTOS of one plant): p = renormalised exp(mean over photos of log P)
   6 set = conformal.predict_sets(p, qhat); unknown if conformal.is_unknown(max sim, thr)
   7 rank, label, conf = hierarchy.backoff(p, taxa, BACKOFF_TAU)
   8 if rerank.should_rerank(set): rerank over top-5 of set
@@ -15,11 +15,17 @@ Fitted state (weights, T, qhat, thr, beta) is saved to CACHE_DIR/state/<dataset>
 Implementation notes (L6-a)
 - State (weights, T, qhat, thr, scorer hyper-params) comes from L3-b's state file; L6 adds "beta" (geo prior
   strength, fitted on cal by NLL over BETA_GRID). Missing "beta" -> 0 (no prior).
-- The probe is refitted on the gallery at load time (no pickles in the cache); C comes from the state.
+- Heads (L6-c): the probe is HeadScorer.load(state["probe"]["weights"]) (L3-c torch head, pure-numpy inference);
+  only when that file is missing is the sklearn probe refitted on the gallery from state["probe"]["C"].
+  If state["final"] == "ensemble" (and the ensemble block is kept), the ensemble scorers / weights / T / qhat are
+  used and its "mlp" head is HeadScorer.load(state["heads"]["mlp"]["weights"]).
 - Text scorer is skipped when CACHE_DIR/text/<dataset>.npz is missing; reranker when VANALENS_LLM_KEY is empty.
 - Geo prior is applied ONCE after the multi-photo combination (step 5 before step 4), so k photos of one plant
-  do not apply the prior k times.
-- add_species: the probe cannot grow columns without retraining, so for classes added after fitting it defers to
+  do not apply the prior k times. The combination is the MEAN of the calibrated log-probabilities (L6-c), so an
+  observation of k photos is exactly as confident as its photos agree, not k times more (keeps the conformal qhat,
+  fitted on single photos, meaningful). Photos beyond MAX_PHOTOS are ignored. VanaLens.combine is that step alone,
+  for evaluation on cached embeddings.
+- add_species: the heads (probe, mlp) cannot grow columns without retraining, so for classes added after fitting it defers to
   the kNN scorer (probe mass scaled by 1 - kNN mass on the new classes). The text scorer gets an
   "a photo of <species>" prototype from the BioCLIP 2 text tower.
 - CLI (L6 owns no scripts):  python -m vanalens.pipeline fit-beta --dataset inat_india
@@ -40,7 +46,7 @@ import numpy as np
 from . import config, conformal, fusion, geo, hierarchy, rerank
 from .config import BACKOFF_TAU, BIOCLIP_DIM, LLM_KEY_ENV
 from .contracts import EmbeddingSet, Prediction, Taxon, check_embeddings, load_taxa
-from .scorers import KNNScorer, ProbeScorer, TextScorer
+from .scorers import HeadScorer, KNNScorer, ProbeScorer, TextScorer
 
 BETA_GRID = (0.0, 0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0)
 ORGAN_PROMPTS = {
@@ -53,6 +59,8 @@ ORGAN_PROMPTS = {
 }
 N_EVIDENCE = 3
 N_RERANK = 5
+MAX_PHOTOS = 3
+HEADS = ("probe", "mlp")
 
 
 def _load_encoder():
@@ -92,18 +100,26 @@ class VanaLens:
         self.n_fit = len(self.taxa)            # classes the probe knows
         kp = state.get("knn", {})
         self.knn = KNNScorer(gallery, self.n_fit, k=kp.get("k", 10), temperature=kp.get("temperature", 0.05))
-        self.probe = ProbeScorer(self.n_fit, C=state.get("probe", {}).get("C", 1.0)).fit(gallery)
+        ens = state.get("ensemble") or {}
+        self.config_name = "ensemble" if state.get("final") == "ensemble" and ens.get("kept", True) else "fused"
+        cfg = ens if self.config_name == "ensemble" else state
+        self.heads: dict = {}
+        for n in cfg["scorers"]:
+            if n in HEADS and float(cfg["weights"].get(n, 0)) != 0:
+                self.heads[n] = self._load_head(n, state, gallery)
+        self.probe = self.heads.get("probe")
         self.text: TextScorer | None = None
         if text is not None:
             tt = (state.get("text") or {}).get("temperature", 0.01)
             self.text = TextScorer(list(text[0]), [list(s) for s in text[1]], temperature=tt)
-        w = state["weights"]
-        self.names = [n for n in state["scorers"] if (n != "text" or self.text is not None) and w.get(n, 0) != 0]
+        w = cfg["weights"]
+        self.names = [n for n in cfg["scorers"] if (n != "text" or self.text is not None) and w.get(n, 0) != 0]
         if not self.names:                     # only the (missing) text scorer had weight
             self.names = ["probe"]
+            self.heads["probe"] = self.probe = self._load_head("probe", state, gallery)
         self.weights = [float(w.get(n, 1.0)) for n in self.names]
-        self.T = float(state["T"])
-        self.qhat = float(state["qhat"])
+        self.T = float(cfg["T"])
+        self.qhat = float(cfg["qhat"])
         self.thr = float(state["thr"])
         self.beta = float(state.get("beta", 0.0))
         self.id_to_path = dict(id_to_path or {})
@@ -112,6 +128,20 @@ class VanaLens:
             self.class_ids.setdefault(int(c), []).append(i)
         self._encoder = encoder
         self._organ_protos: np.ndarray | None = None
+        self._prior_cache: dict[tuple[float, float], np.ndarray | None] = {}
+
+    def _load_head(self, name: str, state: dict, gallery: EmbeddingSet):
+        """Saved L3-c head (HeadScorer .npz) if its file exists, else (probe only) the sklearn probe refit."""
+        info = state.get("probe", {}) if name == "probe" else (state.get("heads") or {}).get(name, {})
+        path = info.get("weights")
+        if path and Path(path).exists():
+            head = HeadScorer.load(path)
+            if head.n_classes != self.n_fit:
+                raise ValueError(f"{name} head has {head.n_classes} classes, labels.json has {self.n_fit}")
+            return head
+        if name != "probe":
+            raise FileNotFoundError(f"state names a {name!r} head but its weights file is missing: {path}")
+        return ProbeScorer(self.n_fit, C=info.get("C", 1.0)).fit(gallery)
 
     # ---------------------------------------------------------------- loading
     @classmethod
@@ -149,8 +179,8 @@ class VanaLens:
         for n in self.names:
             if n == "knn":
                 out.append(Pk)
-            elif n == "probe":
-                Pp = self.probe.predict_proba(X)
+            elif n in self.heads:
+                Pp = self.heads[n].predict_proba(X)
                 if C > self.n_fit:             # defer to kNN for classes added after fitting
                     new = Pk[:, self.n_fit:]
                     Pp = np.hstack([Pp * (1.0 - new.sum(1, keepdims=True)), new])
@@ -172,8 +202,24 @@ class VanaLens:
     def _geo(self, lat: float | None, lon: float | None) -> np.ndarray | None:
         if lat is None or lon is None or self.beta == 0:
             return None
-        counts = geo.gbif_species_counts(lat, lon)
-        return geo.geo_prior(counts, self.taxa) if counts else None
+        key = (float(lat), float(lon))
+        if key not in self._prior_cache or (self._prior_cache[key] is not None
+                                            and len(self._prior_cache[key]) != len(self.taxa)):
+            counts = geo.gbif_species_counts(lat, lon)
+            self._prior_cache[key] = geo.geo_prior(counts, self.taxa) if counts else None
+        return self._prior_cache[key]
+
+    def combine(self, FT: np.ndarray, lat: float | None = None, lon: float | None = None) -> np.ndarray:
+        """(k, C) calibrated per-photo probabilities of ONE plant -> (C,) distribution: mean of the log-probs over
+        the first MAX_PHOTOS photos, renormalised, then the geo prior (once) when beta > 0 and coords are given."""
+        FT = np.atleast_2d(FT)[:MAX_PHOTOS]
+        logp = np.log(FT + 1e-12).mean(0)
+        p = np.exp(logp - logp.max())
+        p /= p.sum()
+        prior = self._geo(lat, lon)
+        if prior is not None:
+            p = geo.apply_prior(p[None], prior, self.beta)[0]
+        return p
 
     def _traits(self, c: int, n: int = 4) -> list[str]:
         return list(self.text.trait_strings[c][:n]) if self.text is not None else []
@@ -183,17 +229,11 @@ class VanaLens:
                 use_rerank: bool = True) -> Prediction:
         if not paths:
             raise ValueError("predict needs at least one photo")
-        X = np.asarray(self.encoder.embed_paths(list(paths)), dtype=np.float32)
+        paths = list(paths)[:MAX_PHOTOS]
+        X = np.asarray(self.encoder.embed_paths(paths), dtype=np.float32)
         check_embeddings(X)
         organ = self._organ(X)
-
-        FT = self.scores(X)
-        logp = np.log(FT + 1e-12).sum(0)
-        p = np.exp(logp - logp.max())
-        p /= p.sum()
-        prior = self._geo(lat, lon)
-        if prior is not None:
-            p = geo.apply_prior(p[None], prior, self.beta)[0]
+        p = self.combine(self.scores(X), lat, lon)
 
         pred_set = [int(i) for i in conformal.predict_sets(p[None], self.qhat)[0]]
         sim = self.knn.max_similarity(X)
@@ -294,23 +334,29 @@ def fit_beta_cached(dataset: str) -> dict:
 
 def run_e2e(dataset: str, n: int = 20, manifest: Path | None = None, seed: int = 0,
             use_rerank: bool = True) -> dict:
-    """Predict `n` photos from a labelled manifest one by one through the full pipeline; save runs/L6/e2e_*.json."""
+    """Predict `n` labelled observations (all photos of a group, up to MAX_PHOTOS) one by one through the full
+    pipeline; save runs/L6/e2e_<dataset>.json."""
     from .data import read_manifest
 
     manifest = manifest or config.CACHE_DIR / "manifests" / f"{dataset}_test.jsonl"
-    samples = [s for s in read_manifest(manifest) if s.label is not None]
+    obs: dict[str, list] = {}
+    for s in read_manifest(manifest):
+        if s.label is not None:
+            obs.setdefault(s.group or s.image_id, []).append(s)
+    keys = sorted(obs)
     rng = np.random.default_rng(seed)
-    pick = sorted(rng.choice(len(samples), size=min(n, len(samples)), replace=False).tolist())
+    pick = sorted(rng.choice(len(keys), size=min(n, len(keys)), replace=False).tolist())
     t0 = time.perf_counter()
     lens = VanaLens.from_cache(dataset)
     load_s = time.perf_counter() - t0
     rows = []
     for k in pick:
-        s = samples[k]
+        group = obs[keys[k]][:MAX_PHOTOS]
+        s = group[0]
         t1 = time.perf_counter()
-        pr = lens.predict([s.path], lat=s.lat, lon=s.lon, use_rerank=use_rerank)
+        pr = lens.predict([g.path for g in group], lat=s.lat, lon=s.lon, use_rerank=use_rerank)
         sec = time.perf_counter() - t1
-        rows.append({"image_id": s.image_id, "label": int(s.label), "top1": int(pr.top_k[0][0]),
+        rows.append({"group": keys[k], "n_photos": len(group), "label": int(s.label), "top1": int(pr.top_k[0][0]),
                      "correct": int(pr.top_k[0][0] == s.label), "in_set": int(s.label in pr.pred_set),
                      "set_size": len(pr.pred_set), "rank": pr.rank, "organ": pr.organ,
                      "reranked": pr.reranked, "seconds": round(sec, 3)})
@@ -323,15 +369,17 @@ def run_e2e(dataset: str, n: int = 20, manifest: Path | None = None, seed: int =
         "species_rank_rate": round(float(np.mean([r["rank"] == "species" for r in rows])), 4),
         "unknown_rate": round(float(np.mean([r["rank"] == "unknown" for r in rows])), 4),
         "reranked_rate": round(float(np.mean([r["reranked"] for r in rows])), 4),
-        "seconds_per_photo": round(float(np.mean(secs)), 3),
-        "seconds_per_photo_warm": round(float(np.mean(secs[1:])) if len(secs) > 1 else float(secs[0]), 3),
+        "n_photos": int(sum(r["n_photos"] for r in rows)),
+        "seconds_per_obs": round(float(np.mean(secs)), 3),
+        "seconds_per_obs_warm": round(float(np.mean(secs[1:])) if len(secs) > 1 else float(secs[0]), 3),
         "load_seconds": round(load_s, 2),
         "device": os.environ.get("VANALENS_DEVICE", "cuda"),
-        "scorers": lens.names, "weights": lens.weights, "beta": lens.beta,
+        "config": lens.config_name, "scorers": lens.names, "weights": lens.weights, "beta": lens.beta,
         "rerank_enabled": bool(use_rerank and os.environ.get(LLM_KEY_ENV)),
         "rows": rows,
     }
     out_path = config.RUNS_DIR / "L6" / f"e2e_{manifest.stem.replace('_test', '')}.json"
+    out["encoder"] = type(lens.encoder).__name__
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(out, indent=1))
     return out

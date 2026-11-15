@@ -58,13 +58,56 @@ def test_predict_shape_and_accuracy(lens, clusters):
     assert correct / len(range(0, len(yq), 3)) >= 0.9
 
 
-def test_multi_photo_sharpens(lens, clusters):
+def test_multi_photo_mean_log_probs(lens, clusters):
+    """Observation = renormalised exp(mean of calibrated log-probs) of its photos (L6-c), capped at MAX_PHOTOS."""
     yq = clusters["yq"]
-    idx = np.where(yq == 2)[0][:3]
-    one = lens.predict([f"q{idx[0]}.jpg"])
-    many = lens.predict([f"q{i}.jpg" for i in idx])
+    idx = np.where(yq == 2)[0][:4]
+    many = lens.predict([f"q{i}.jpg" for i in idx[:3]])
+    FT = lens.scores(clusters["Xq"][idx[:3]])
+    g = np.exp(np.log(FT + 1e-12).mean(0))
+    assert np.allclose(many.probs, g / g.sum(), atol=1e-9)
     assert many.top_k[0][0] == 2
-    assert many.probs[2] >= one.probs[2] - 1e-9
+    same = lens.predict([f"q{idx[0]}.jpg"] * 3)       # identical photos: mean == one photo (no overconfidence)
+    one = lens.predict([f"q{idx[0]}.jpg"])
+    assert np.allclose(same.probs, one.probs, atol=1e-9)
+    four = lens.predict([f"q{i}.jpg" for i in idx])   # 4th photo ignored
+    assert np.allclose(four.probs, many.probs) and pipeline.MAX_PHOTOS == 3
+
+
+def _toy_head(tmp_path, clusters, name, hidden):
+    from vanalens.scorers import HeadScorer
+    h = HeadScorer(C, hidden=hidden, epochs=5, device="cpu").fit(clusters["gallery"].X, clusters["gallery"].y)
+    path = tmp_path / f"{name}.npz"
+    h.save(path)
+    return h, str(path)
+
+
+def test_saved_head_and_ensemble_state(tmp_path, taxa, clusters, text_protos):
+    pytest.importorskip("torch")
+    lin, lp = _toy_head(tmp_path, clusters, "lin", 0)
+    mlp, mp = _toy_head(tmp_path, clusters, "mlp", 16)
+    st = dict(STATE, probe={"weights": lp, "C": 10.0}, heads={"probe": {"weights": lp}, "mlp": {"weights": mp}})
+    v = VanaLens(taxa, clusters["gallery"], st, text=text_protos, encoder=FakeEncoder({}))
+    assert v.config_name == "fused" and np.allclose(v.probe.predict_proba(clusters["Xq"]),
+                                                     lin.predict_proba(clusters["Xq"]))
+    ens = {"scorers": ["knn", "probe", "mlp", "text"], "weights": {"knn": 0.0, "probe": 0.2, "mlp": 0.6, "text": 0.2},
+           "T": 0.7, "qhat": 0.3, "kept": True}
+    v2 = VanaLens(taxa, clusters["gallery"], dict(st, final="ensemble", ensemble=ens), text=text_protos,
+                  encoder=FakeEncoder({}))
+    assert v2.config_name == "ensemble" and v2.names == ["probe", "mlp", "text"]
+    assert v2.T == 0.7 and v2.qhat == 0.3 and set(v2.heads) == {"probe", "mlp"}
+    X = clusters["Xq"]
+    from vanalens import fusion
+    exp = fusion.apply_temperature(fusion.fuse([lin.predict_proba(X), mlp.predict_proba(X),
+                                                v2.text.predict_proba(X)], [0.2, 0.6, 0.2]), 0.7)
+    assert np.allclose(v2.scores(X), exp)
+    v3 = VanaLens(taxa, clusters["gallery"], dict(st, final="ensemble", ensemble=dict(ens, kept=False)),
+                  text=text_protos, encoder=FakeEncoder({}))
+    assert v3.config_name == "fused" and v3.qhat == STATE["qhat"]
+    with pytest.raises(FileNotFoundError):            # ensemble names an mlp whose file is gone
+        VanaLens(taxa, clusters["gallery"], dict(st, final="ensemble", ensemble=ens,
+                                                 heads={"mlp": {"weights": str(tmp_path / "gone.npz")}}),
+                 text=text_protos, encoder=FakeEncoder({}))
 
 
 def test_text_scorer_skipped_without_protos(taxa, clusters):

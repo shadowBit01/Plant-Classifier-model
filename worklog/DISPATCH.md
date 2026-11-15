@@ -233,3 +233,11 @@ Append-only. One entry per dispatcher run. Format: AGENTS.md section 6.
 - Results: 0 merged, 0 dispatched, 0 blocked
 - Needs: none
 - Next: L6-c in flight; merge L6 when DONE, then dispatch what it unblocks (L7 cards).
+
+## 2026-11-15 19:27 | DISPATCH | DONE
+- Did: run 30: merged L6 (L6-c); dispatched L7-b (Claude, deck redesign).
+- Files: worklog/DISPATCH.md
+- Tests: merge gate tests passed (merge_lanes.py)
+- Results: 1 merged, 1 dispatched, 0 blocked
+- Needs: none
+- Next: L7-b in flight; merge L7 when DONE, then check all_done for PROJECT COMPLETE.

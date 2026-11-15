@@ -614,29 +614,35 @@ def fetch_photos_for_species(
         allow_non_rg = quality_grade is None
         forced_india = True if place_id == INDIA_PLACE_ID else None
 
-        # If we need both pre and post, try a single combined call first
+        # Try a single combined call first
+        d2_smart: str | None = None
+        res1_len = 0
+        tried_combined = False
         if len(pre_photos) < max_pre_photos and post_obs_count < max_post_obs:
+            tried_combined = True
             p1 = dict(base_params)
-            p1["per_page"] = 200
             d2_smart = _choose_smart_d2(expected_cnt)
+            p1["per_page"] = 140 if d2_smart is not None else 200
             if d2_smart is not None:
                 p1["d2"] = d2_smart
             res1 = api_get("observations", p1).get("results") or []
+            res1_len = len(res1)
             _ingest(res1, allow_non_rg, forced_india)
 
-        # Follow-up for post-cutoff if still needed
-        if post_obs_count < max_post_obs and expected_cnt > 0:
+        # Follow-up for post-cutoff only if we didn't already query from today downwards
+        if post_obs_count < max_post_obs and expected_cnt > 0 and (not tried_combined or d2_smart is not None):
             p_post = dict(base_params)
             p_post["d1"] = "2025-07-01"
-            p_post["per_page"] = 30
+            p_post["per_page"] = 25
             res_post = api_get("observations", p_post).get("results") or []
             _ingest(res_post, allow_non_rg, forced_india)
 
-        # Follow-up for pre-cutoff if still needed
-        if len(pre_photos) < max_pre_photos and expected_cnt > 0:
+        # Follow-up for pre-cutoff only if combined call wasn't tried or hit page limit before getting 80 photos
+        page_cap = 140 if d2_smart is not None else 200
+        if len(pre_photos) < max_pre_photos and expected_cnt > 0 and (not tried_combined or res1_len >= page_cap):
             p_pre = dict(base_params)
             p_pre["d2"] = "2025-06-30"
-            p_pre["per_page"] = 80
+            p_pre["per_page"] = 65
             res_pre = api_get("observations", p_pre).get("results") or []
             _ingest(res_pre, allow_non_rg, forced_india)
 
@@ -793,8 +799,18 @@ def build_vl600(
     cache_dir = Path(cache_dir)
     runs_dir = Path(runs_dir)
 
+    log_path = runs_dir / "logs" / "build_vl600.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_lock = threading.Lock()
+
     def _log(msg: str) -> None:
         print(msg, flush=True)
+        with log_lock:
+            try:
+                with log_path.open("a", encoding="utf-8") as lf:
+                    lf.write(msg + "\n")
+            except Exception:
+                pass
 
     _log("[vl600] Step 1: selecting species by observation count...")
     species_list, total_india_obs = select_vl600_species(

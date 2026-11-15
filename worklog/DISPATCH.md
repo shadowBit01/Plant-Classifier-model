@@ -73,3 +73,11 @@ Append-only. One entry per dispatcher run. Format: AGENTS.md section 6.
 - Results: 1 merged, 1 dispatched, 0 blocked
 - Needs: none
 - Next: merge L5-b (space/) and L7-a (pitch deck) when DONE; then PROJECT COMPLETE if all_done.
+
+## 2026-11-15 14:38 | DISPATCH | DONE
+- Did: pulled main (clean); merge_lanes.py merged L5 (L5-b) and L7 (L7-a), 0 failed; dispatched L1-d (Antigravity A / antigravity gemini-4-argon) and L5-c (Antigravity B / antigravity_2 gemini-3.8-flash), Local full-access, Plant-Classifier-model. No blocked items.
+- Files: worklog/DISPATCH.md
+- Tests: lane gate tests run by merge_lanes.py (passed)
+- Results: 2 merged, 2 dispatched, 0 blocked
+- Needs: none
+- Next: L1-d builds vl600 (long download); L5-c extends app; merge when DONE and dispatch what vl600 unblocks.

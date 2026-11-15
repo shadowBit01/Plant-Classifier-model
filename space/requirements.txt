@@ -1,0 +1,16 @@
+torch
+torchvision
+numpy
+scikit-learn
+pillow
+tqdm
+pandas
+requests
+faiss-cpu
+open_clip_torch
+pybioclip
+transformers>=4.56
+timm
+huggingface_hub
+gradio>=6.0
+anthropic

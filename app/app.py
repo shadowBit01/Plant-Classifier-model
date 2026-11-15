@@ -16,11 +16,44 @@ Never call models directly: only vanalens.pipeline.get_pipeline().
 """
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 import gradio as gr
 
+from vanalens import config as vanalens_config
 from vanalens.config import ALPHA
 from vanalens.contracts import ORGANS, Taxon
 from vanalens.pipeline import get_pipeline
+
+os.environ.setdefault("VANALENS_MOCK", "0")
+
+_PIPELINE = None
+
+
+def load_pipeline():
+    """Sync cache/data paths from environment variables and load the pipeline via get_pipeline()."""
+    os.environ.setdefault("VANALENS_MOCK", "0")
+    dataset = os.environ.get("VANALENS_DATASET", "inat_india")
+    state_env = os.environ.get("VANALENS_STATE")
+    if state_env:
+        sp = Path(state_env)
+        if sp.suffix == ".json":
+            dataset = sp.stem
+            if sp.parent.name == "state":
+                vanalens_config.CACHE_DIR = sp.parent.parent
+        elif sp.is_dir():
+            vanalens_config.CACHE_DIR = sp
+    if "VANALENS_CACHE" in os.environ:
+        vanalens_config.CACHE_DIR = Path(os.environ["VANALENS_CACHE"])
+    if "VANALENS_DATA" in os.environ:
+        vanalens_config.DATA_DIR = Path(os.environ["VANALENS_DATA"])
+    elif (vanalens_config.CACHE_DIR / dataset / "labels.json").exists():
+        vanalens_config.DATA_DIR = vanalens_config.CACHE_DIR
+    if dataset != "inat_india":
+        return get_pipeline(dataset)
+    return get_pipeline()
+
 
 # Try to import read_exif_gps; it may be NotImplementedError at runtime (dev stub).
 try:
@@ -167,7 +200,10 @@ def predict_fn(images, lat_str: str, lon_str: str):
             lat, lon = gps
 
     # Run prediction
-    pipeline = get_pipeline()
+    global _PIPELINE
+    if _PIPELINE is None:
+        _PIPELINE = load_pipeline()
+    pipeline = _PIPELINE
     try:
         pred = pipeline.predict(paths, lat=lat, lon=lon)
     except Exception as exc:
@@ -213,7 +249,10 @@ def add_species_fn(name: str, genus: str, family: str, photos):
     if len(paths) > 10:
         return "⚠️ Please upload at most 10 photos."
 
-    pipeline = get_pipeline()
+    global _PIPELINE
+    if _PIPELINE is None:
+        _PIPELINE = load_pipeline()
+    pipeline = _PIPELINE
     taxon = Taxon(idx=-1, species=name.strip(), genus=genus.strip(), family=family.strip())
     try:
         pipeline.add_species(taxon, paths)
@@ -244,7 +283,9 @@ body { font-family: system-ui, sans-serif; }
 
 
 def build_ui() -> gr.Blocks:
-    pipeline = get_pipeline()
+    global _PIPELINE
+    _PIPELINE = load_pipeline()
+    pipeline = _PIPELINE
 
     with gr.Blocks(title="VanaLens \u2013 Plant Identifier") as demo:
         gr.Markdown(

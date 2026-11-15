@@ -15,6 +15,10 @@ Outputs
 Heads train on gallery X (+ X_aug). Their hyper-parameters and early stopping, the default head (linear unless the
 MLP wins on cal by more than MLP_MARGIN top-1), fusion weights, T, qhat, the open-set threshold and whether the
 ensemble is kept are all chosen on cal. Test is only evaluated.
+
+Block weighting (L3-d): the DINO block weight w (DINO vs BioCLIP) is chosen on cal separately for kNN
+(KNN_DINO_GRID, similarity = cos_bio + w cos_dino) and for each head (the best w=1 config is retrained with
+HEAD_DINO_GRID; w is baked into the saved head). A w != 1 is kept only if it strictly improves cal top-1.
 """
 from __future__ import annotations
 
@@ -39,6 +43,8 @@ KNN_TEMP = 0.05
 PROBE_C_GRID = (1.0, 10.0, 100.0, 1000.0)   # sklearn fallback only (no torch), chosen on cal
 TEXT_TEMP = 0.01
 OPENSET_PASS = 0.95   # fraction of known-species cal queries that must pass the open-set gate
+KNN_DINO_GRID = (0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0)
+HEAD_DINO_GRID = (0.5, 0.75, 1.5, 2.0)   # retrained for the best w=1 head config only
 MLP_MARGIN = 0.01     # MLP replaces the linear probe as default only if it beats it on cal by more than this
 # Head grids: every combination is trained and the best is chosen on cal top-1 (ties: NLL).
 # weight_decay is an explicit L2 penalty sum(W**2) (see HeadScorer).
@@ -98,18 +104,48 @@ def _grid(g: dict) -> list[dict]:
     return out
 
 
-def fit_head(X, y, Xc, yc, C, fixed, grid, device, log) -> tuple[HeadScorer, list[dict]]:
-    """Train every grid config with early stopping on cal; return the best head (cal top-1, ties NLL) + table."""
+def fit_head(X, y, Xc, yc, C, fixed, grid, device, log,
+             dino_grid: tuple = ()) -> tuple[HeadScorer, list[dict], list[dict]]:
+    """Train every grid config with early stopping on cal; return the best head (cal top-1, ties NLL) + table.
+
+    Then retrain the best config with each DINO block weight in `dino_grid`; one replaces the w=1 head only if
+    it is strictly better on cal (top-1, ties NLL). Returns (head, grid table, block-weight table)."""
     best, table = None, []
-    for cfg in _grid(grid):
+    cfgs = _grid(grid)
+    for cfg in cfgs:
         h = HeadScorer(C, device=device, **fixed, **cfg).fit(X, y, Xc, yc)
         Pc = h.predict_proba(Xc)
         key = (-topk_acc(Pc, yc, 1), fusion.nll(Pc, yc))
         table.append(cfg | {"cal_top1": round(-key[0], 4), "cal_nll": round(key[1], 4), "best_epoch": h.best_epoch})
         log(f"  head hidden={fixed.get('hidden', 0)} {cfg} cal top1 {-key[0]:.4f} ep {h.best_epoch}")
         if best is None or key < best[0]:
-            best = (key, h)
-    return best[1], table
+            best = (key, h, cfg)
+    block = [best[2] | {"dino_weight": 1.0, "cal_top1": round(-best[0][0], 4), "cal_nll": round(best[0][1], 4)}]
+    for w in dino_grid:
+        cfg = best[2] | {"dino_weight": w}
+        h = HeadScorer(C, device=device, **fixed, **cfg).fit(X, y, Xc, yc)
+        Pc = h.predict_proba(Xc)
+        key = (-topk_acc(Pc, yc, 1), fusion.nll(Pc, yc))
+        block.append(cfg | {"cal_top1": round(-key[0], 4), "cal_nll": round(key[1], 4), "best_epoch": h.best_epoch})
+        log(f"  head hidden={fixed.get('hidden', 0)} {cfg} cal top1 {-key[0]:.4f} ep {h.best_epoch}")
+        if key < best[0]:
+            best = (key, h, cfg)
+    return best[1], table, block
+
+
+def choose_knn_dino(gallery: EmbeddingSet, C: int, Xc: np.ndarray, yc: np.ndarray,
+                    grid: tuple = KNN_DINO_GRID) -> tuple[float, list[dict]]:
+    """DINO block weight for kNN on cal top-1 (ties NLL); w=1 unless another weight is strictly better."""
+    table, best = [], None
+    for w in grid:
+        Pc = KNNScorer(gallery, C, k=KNN_K, temperature=KNN_TEMP, dino_weight=w).predict_proba(Xc)
+        key = (-topk_acc(Pc, yc, 1), fusion.nll(Pc, yc))
+        table.append({"dino_weight": w, "cal_top1": round(-key[0], 4), "cal_nll": round(key[1], 4)})
+        if w == 1.0:
+            base = key
+        if best is None or key < best[0]:
+            best = (key, w)
+    return (best[1] if best[0] < base else 1.0), table
 
 
 def calibrated(names: list[str], Pcal: dict, Ptest: dict, y_cal: np.ndarray, alpha: float) -> dict:
@@ -154,7 +190,9 @@ def main(argv: list[str] | None = None) -> int:
         n_aug = int(d["y_aug"].shape[0])
     del d
 
-    knn = KNNScorer(emb["gallery"], C, k=KNN_K, temperature=KNN_TEMP)
+    knn_dino, knn_table = choose_knn_dino(emb["gallery"], C, Xc, y_cal)
+    log(f"{ds}: kNN DINO weight on cal {knn_table} -> {knn_dino}")
+    knn = KNNScorer(emb["gallery"], C, k=KNN_K, temperature=KNN_TEMP, dino_weight=knn_dino)
     state_dir = CACHE_DIR / "state"
     state_dir.mkdir(parents=True, exist_ok=True)
     heads: dict[str, object] = {}
@@ -167,11 +205,12 @@ def main(argv: list[str] | None = None) -> int:
     if has_torch:
         log(f"{ds}: training heads on {len(y_tr)} rows ({n_aug} augmented), device={args.device or 'auto'}")
         for name, fixed, grid in (("probe", LINEAR_FIXED, LINEAR_GRID), ("mlp", MLP_FIXED, MLP_GRID)):
-            h, table = fit_head(X_tr, y_tr, Xc, y_cal, C, fixed, grid, args.device, log)
+            h, table, block = fit_head(X_tr, y_tr, Xc, y_cal, C, fixed, grid, args.device, log, HEAD_DINO_GRID)
             path = state_dir / f"{ds}_probe_{'linear' if name == 'probe' else 'mlp'}.npz"
             h.save(path)
             heads[name] = h
-            head_info[name] = {"backend": "torch", "weights": str(path), "config": h.config(), "grid": table}
+            head_info[name] = {"backend": "torch", "weights": str(path), "config": h.config(), "grid": table,
+                               "block_grid": block}
     else:  # sklearn CPU fallback: linear probe only, C chosen on cal
         best = None
         for c_reg in PROBE_C_GRID:
@@ -217,7 +256,7 @@ def main(argv: list[str] | None = None) -> int:
 
     sim_cal = knn.max_similarity(Xc)
     thr = float(np.quantile(sim_cal, 1.0 - OPENSET_PASS))
-    probe_state = {k: v for k, v in head_info[default_head].items() if k != "grid"}
+    probe_state = {k: v for k, v in head_info[default_head].items() if k not in ("grid", "block_grid")}
     probe_state["head"] = "linear" if default_head == "probe" else "mlp"
     probe_state.setdefault("C", 100.0)   # only for consumers that still refit the sklearn probe from C
     state = {
@@ -230,11 +269,14 @@ def main(argv: list[str] | None = None) -> int:
         "alpha": float(args.alpha),
         "qhat": base["qhat"],
         "thr": thr,
-        "knn": {"k": KNN_K, "temperature": KNN_TEMP},
+        "knn": {"k": KNN_K, "temperature": KNN_TEMP, "dino_weight": knn_dino, "dino_grid": knn_table},
+        "block_weight": {"knn_dino": knn_dino, "heads_dino": {n: getattr(h, "dino_weight", 1.0)
+                                                               for n, h in heads.items()},
+                         "rule": "sim/feature = bio + w*dino; w chosen on cal, kept only if cal top-1 improves"},
         "probe": probe_state,
         "default_head": {"choice": probe_state["head"], "rule": f"mlp only if cal top1 > linear + {MLP_MARGIN}",
                          "cal_top1": {n: round(cal_top1[n], 4) for n in heads}},
-        "heads": {n: {k: v for k, v in i.items() if k != "grid"} for n, i in head_info.items()},
+        "heads": {n: {k: v for k, v in i.items() if k not in ("grid", "block_grid")} for n, i in head_info.items()},
         "ensemble": (None if ens is None else {
             "scorers": ens["names"], "weights": {n: float(w) for n, w in zip(ens["names"], ens["weights"])},
             "T": ens["T"], "qhat": ens["qhat"], "cal_top1": round(ens["cal_top1"], 4),
@@ -268,7 +310,8 @@ def main(argv: list[str] | None = None) -> int:
 
     final = "ensemble" if state["final"] == "ensemble" else "fused+T+sets"
     out = {"dataset": ds, "split": "test", "n_test": len(y_test), "final_row": final,
-           "head_grids": {n: i.get("grid") for n, i in head_info.items()}, "state": state, "rows": rows}
+           "head_grids": {n: i.get("grid") for n, i in head_info.items()},
+           "head_block_grids": {n: i.get("block_grid") for n, i in head_info.items()}, "state": state, "rows": rows}
     out_path = RUNS_DIR / "L3" / f"ablation_{ds}.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(out, indent=1))

@@ -122,3 +122,34 @@ def test_fit_core_vl600_like(tmp_path, monkeypatch):
             assert k in m
     assert abl["rows"]["ensemble"]["top1"] > 0.8
     assert abl["final_row"] in abl["rows"]
+
+
+def test_dino_block_weight_knn_and_head():
+    """L3-d: dino_weight scales the DINO block (kNN sim = bio + w*dino; head bakes w into saved sd)."""
+    import tempfile
+    from pathlib import Path as _P
+
+    from vanalens.config import BIOCLIP_DIM
+    from vanalens.contracts import EmbeddingSet
+    from vanalens.scorers import HeadScorer, KNNScorer
+
+    rng = np.random.default_rng(0)
+    def blk(n):
+        b, d = rng.normal(size=(n, BIOCLIP_DIM)), rng.normal(size=(n, EMB_DIM - BIOCLIP_DIM))
+        b /= np.linalg.norm(b, axis=1, keepdims=True)
+        d /= np.linalg.norm(d, axis=1, keepdims=True)
+        return np.hstack([b, d]).astype(np.float32)
+    G, Q = blk(5), blk(3)
+    gal = EmbeddingSet([f"g{i}" for i in range(5)], G, np.arange(5))
+    for w in (0.0, 0.5, 2.0):
+        sim = KNNScorer(gal, 5, dino_weight=w).max_similarity(Q)
+        ref = (Q[:, :BIOCLIP_DIM] @ G[:, :BIOCLIP_DIM].T + w * Q[:, BIOCLIP_DIM:] @ G[:, BIOCLIP_DIM:].T).max(1)
+        assert np.allclose(sim, ref, atol=1e-5)
+    pytest.importorskip("torch")
+    X, y = blk(40), np.arange(40) % 4
+    h = HeadScorer(4, epochs=3, device="cpu", dino_weight=2.0).fit(X, y)
+    assert np.allclose(h.params["sd"][BIOCLIP_DIM:], 1 / 20.0) and np.allclose(h.params["sd"][:BIOCLIP_DIM], 0.1)
+    with tempfile.TemporaryDirectory() as td:
+        h.save(_P(td) / "h.npz")
+        h2 = HeadScorer.load(_P(td) / "h.npz")
+    assert h2.dino_weight == 2.0 and np.allclose(h2.predict_proba(X), h.predict_proba(X))

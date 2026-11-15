@@ -241,3 +241,11 @@ Append-only. One entry per dispatcher run. Format: AGENTS.md section 6.
 - Results: 1 merged, 1 dispatched, 0 blocked
 - Needs: none
 - Next: L7-b in flight; merge L7 when DONE, then check all_done for PROJECT COMPLETE.
+
+## 2026-11-15 19:40 | DISPATCH | DONE
+- Did: run 31: idle; nothing to merge, dispatch or unblock. L7-b in flight.
+- Files: worklog/DISPATCH.md
+- Tests: none
+- Results: 0 merged, 0 dispatched, 0 blocked
+- Needs: none
+- Next: merge L7 when L7-b DONE, then check all_done for PROJECT COMPLETE.

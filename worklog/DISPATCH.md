@@ -354,3 +354,8 @@ Append-only. One entry per dispatcher run. Format: AGENTS.md section 6.
 - Did: run 52: pulled main (clean); nothing to merge, no blocked, no dispatch; L6-d still in flight.
 - Needs: HUMAN: review stash "autopilot" from run 51 (regenerated pitch/report files)
 - Next: merge L6 when L6-d DONE, then L7-d refreshes numbers/deck.
+
+## 2026-11-16 00:59 | DISPATCH | DONE
+- Did: run 53: pulled main (clean); merged L6 (L6-d final table + e2e) via merge_lanes.py; dispatched L7-e (related work + novelty) and L6-e (baselines block) on Claude (thread_launch needed explicit projectId).
+- Needs: HUMAN: review stash "autopilot" from run 51 (regenerated pitch/report files)
+- Next: merge L6 after L6-e DONE, then L7 after L7-e DONE; L7-d (rebuild numbers/deck) after both.

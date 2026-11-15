@@ -103,3 +103,9 @@ Never cut: baseline table, conformal sets, evidence panel, inat_india test split
   L7-b (deck redesign: clean white/green theme, 11-13 slides, slides exported to PNG via PowerPoint COM and checked),
   L7-c (project report md -> PDF via headless Edge or Word: how it works, methods, dataset, results, limitations,
   plan to overcome them), L7-d (skeptical review of both + demo.md). Report builder lives in pitch/report/ (L7-owned).
+- 2026-11-15 19:55 lead (human approved): DINO weight-loading bug. DINOv3 is gated (no HF login) so the encoder uses
+  dinov2-large, but the custom safetensors loader skips 192/439 tensors (all attention weights; the new transformers
+  renamed them), so the DINO half of every cached embedding is random and differs from the live encoder (live vs cache
+  DINO cos 0.3-0.58, BioCLIP 1.00; live open-set rejects ~95%). Added L2-f (fix loader + test + recompute DINO block for
+  all caches), L3-d (refit on cal), L6-d (re-run final.json + live e2e); L7-c now also depends on L6-d and refreshes
+  the deck numbers. Reported results so far (vl600 1-photo .939) are effectively BioCLIP-only.

@@ -31,7 +31,7 @@ New tests go in new files you own; never edit someone else's test.
 | 3-6 | L1-b, then L2-b, L2-c (GPU), L1-c | inat_india manifests + embeddings cached; baseline JSONs in `runs/` |
 | 6-9 | Claude: L3-b then L6-a. Antigravity B: L4-b | **MVP: real pipeline answers an inat_india test photo** |
 | 9-16 | L6-b, L5-b | final table `runs/L6/final.json` |
-| wave 2 | L1-d (vl600), then L2-e + L4-c, L5-c; then L3-c, L6-c, L7-b (deck), L7-c (report), L7-d (review) | runs/L6/final.json has vl600 with CIs; report + reviewed deck |
+| wave 2 | L1-d (vl600), then L2-e + L4-c, L5-c; then L3-c, L6-c, L7-b (deck); DINO fix L2-f, then L3-d, L6-d; then L7-c (report), L7-d (review) | runs/L6/final.json has vl600 with CIs; report + reviewed deck |
 | 16-19 | fixes only | feature freeze at 19 |
 | 19-24 | Claude: L7-a builds `pitch/VanaLens.pptx` from `runs/L6/final.json` | human rehearses |
 
@@ -192,6 +192,32 @@ Lane tests must pass. DONE entry Results: shapes per split, images/s, failed ima
 When done, inside `.lanes/L2`: DONE entry in worklog/L2.md, commit with prefix [L2], `git push origin HEAD:lane/L2-encoders`, stop.
 ```
 
+**L2-f**
+```
+Lane L2, card L2-f. Setup, from the project root: `& $env:VANALENS_PY scripts/lane.py L2 --start L2-f` (bash: `"$VANALENS_PY" scripts/lane.py L2 --start L2-f`). It prepares your lane folder `.lanes/L2` (git worktree with the latest lane/L2-encoders and main merged in) and commits + pushes your STARTED entry. From then on work ONLY inside `.lanes/L2`: cd into it, read and edit only files under it, run python/pytest there with `$VANALENS_PY`. Never edit files outside `.lanes/L2` (AGENTS.md section 1).
+You are lane L2 (encoders, the only GPU lane). Read AGENTS.md. URGENT BUG (found by the lead, 19:50): the DINO block
+of every cached embedding is noise. DINOv3 is gated (401, no HF login), so Encoder falls back to facebook/dinov2-large,
+but `_load_dino` builds the model with AutoModel.from_config and fills it with `_stream_safetensors_into_model`, which
+matches tensors by name: the installed transformers names DINOv2 attention `attention.q_proj/k_proj/v_proj/o_proj`
+while the checkpoint uses the old names, so 192 of 439 tensors (all attention weights) are silently skipped and stay
+randomly initialised, different on every load. Proof: re-encoding vl600 gallery images gives BioCLIP cos 1.00 vs the
+cache but DINO cos only 0.3-0.58 (same GPU, fp16, TTA). This also breaks the live app (open-set rejects ~95%).
+Do: (1) fix DINO loading so every model parameter is loaded from the checkpoint (e.g. AutoModel.from_pretrained with
+dtype, or a correct key remap), and make the streaming loader raise if any model parameter/buffer is left unloaded
+(also check the BioCLIP path). (2) New test tests/test_l2_weights.py: loading the DINO model leaves 0 unloaded
+tensors, and two Encoder loads give identical embeddings for the same image. (3) Recompute the DINO block for ALL
+cached splits in $VANALENS_CACHE/emb: vl600 gallery (X, X_plain, X_aug with the same crop/flip views, seed 0), cal,
+test, and inat_india gallery/cal/test. Prefer recomputing only the DINO block and keeping the BioCLIP block
+bit-identical (faster); a full re-extract is fine if simpler. Keep flip TTA and per-block re-normalisation exactly as
+before. Set the npz `encoder` field to the real model name (e.g. "bioclip2+dinov2-large"). Write to temp files and
+swap atomically so a crash never leaves a broken cache; background job, log to runs/logs/fix_dino.log, read only the
+last 30 lines. GPU: L7 may have app/app.py open (about 1.5 GB VRAM); pick a batch size that fits next to it.
+(4) Verify: re-encode 20 random gallery images live and report min cos vs cache for both blocks (must be > 0.99), and
+the quick sklearn probe top-1 on vl600 cal (was 0.9051 with TTA) with the new embeddings.
+DONE entry Results: unloaded-tensor count before/after, live-vs-cache cos, probe cal top-1 before/after, images/s.
+When done, inside `.lanes/L2`: DONE entry in worklog/L2.md, commit with prefix [L2], `git push origin HEAD:lane/L2-encoders`, stop.
+```
+
 ## L3 core-ml
 
 **L3-a**
@@ -233,6 +259,20 @@ weights; try an ensemble (probe + MLP + kNN + text, weights fit on cal) and keep
 "ensemble" and "mlp" to the ablation. Report test top-1, top-5, genus and family top-1. If 95% single-photo top-1 is
 not reached, say so plainly with the number; do not tune on test.
 Add synthetic CPU tests in tests/test_l3_vl600.py; tests/test_core.py stays green.
+When done, inside `.lanes/L3`: DONE entry in worklog/L3.md, commit with prefix [L3], `git push origin HEAD:lane/L3-core-ml`, stop.
+```
+
+**L3-d**
+```
+Lane L3, card L3-d. Setup, from the project root: `& $env:VANALENS_PY scripts/lane.py L3 --start L3-d` (bash: `"$VANALENS_PY" scripts/lane.py L3 --start L3-d`). It prepares your lane folder `.lanes/L3` (git worktree with the latest lane/L3-core-ml and main merged in) and commits + pushes your STARTED entry. From then on work ONLY inside `.lanes/L3`: cd into it, read and edit only files under it, run python/pytest there with `$VANALENS_PY`. Never edit files outside `.lanes/L3` (AGENTS.md section 1).
+You are lane L3 (core-ml). Read AGENTS.md and the L2-f DONE entry in scripts/status.py output. L2-f replaced the DINO
+block of every cached embedding (before it, the DINO half was random noise from a weight-loading bug), so every fitted
+state from L3-c is stale. Re-run scripts/fit_core.py for vl600 and inat_india on the new embeddings with the same
+procedure as L3-c: head (linear / MLP) hyper-parameters, kNN, text weight, ensemble weights, temperature, conformal
+qhat and open-set threshold all re-chosen on cal only, never on test. Also re-check per-block weighting now that the
+DINO block carries signal (e.g. a block weight for DINO vs BioCLIP chosen on cal) and keep it only if cal improves.
+Update runs/L3/ablation_{vl600,inat_india}.json. Lane tests must pass. DONE entry Results: vl600 test top-1/top-5,
+genus, family, cal top-1, before (L3-c: test top-1 .933, top-5 .979) vs after; inat_india ensemble top-1.
 When done, inside `.lanes/L3`: DONE entry in worklog/L3.md, commit with prefix [L3], `git push origin HEAD:lane/L3-core-ml`, stop.
 ```
 
@@ -380,6 +420,21 @@ Synthetic tests in tests/test_pipeline.py (no GPU, no network). Print the table 
 When done, inside `.lanes/L6`: DONE entry in worklog/L6.md, commit with prefix [L6], `git push origin HEAD:lane/L6-integration`, stop.
 ```
 
+**L6-d**
+```
+Lane L6, card L6-d. Setup, from the project root: `& $env:VANALENS_PY scripts/lane.py L6 --start L6-d` (bash: `"$VANALENS_PY" scripts/lane.py L6 --start L6-d`). It prepares your lane folder `.lanes/L6` (git worktree with the latest lane/L6-integration and main merged in) and commits + pushes your STARTED entry. From then on work ONLY inside `.lanes/L6`: cd into it, read and edit only files under it, run python/pytest there with `$VANALENS_PY`. Never edit files outside `.lanes/L6` (AGENTS.md section 1).
+You are lane L6 (integration). Read AGENTS.md and the L2-f and L3-d DONE entries in scripts/status.py output. L2-f
+fixed a DINO weight-loading bug (the DINO half of all embeddings was random and differed between the cache and the
+live encoder) and L3-d refitted every state. Re-run scripts/final_table.py -> runs/L6/final.json and the live end-to-end
+check -> runs/L6/e2e_vl600.json with the same procedure as L6-c (CIs by observation, 1 vs 3 photos, selective
+accuracy, open-set holdout, few-shot curve, geo prior beta refit on cal). Confirm that the live pipeline now matches the
+cache: e2e top-1 close to the cached test number and the unknown/reject rate on known test photos back to a normal
+level (it was ~95% because of the bug); if live and cache still disagree, find out why and fix it in your files or
+write BLOCKED with the exact cause. Lane tests must pass. DONE entry Results: the same metric list as L6-c with
+before -> after, and which metrics reach 95%.
+When done, inside `.lanes/L6`: DONE entry in worklog/L6.md, commit with prefix [L6], `git push origin HEAD:lane/L6-integration`, stop.
+```
+
 ## L7 pitch
 
 **L7-a**
@@ -438,7 +493,9 @@ few-shot, per-growth-form or hardest-species error analysis if the data allows);
 implementation (specific and honest); 8 How we plan to overcome them and improve (one concrete step per limitation,
 plus future features such as offline mobile app, more regional species, expert feedback loop); 9 Conclusion;
 References. Figures from pitch/*.png; add a confusion example figure if helpful. Use only numbers that exist in
-runs/; where a result is missing say "not measured". Write clearly and concretely. No em dashes.
+runs/; where a result is missing say "not measured". The numbers changed after L2-f/L3-d/L6-d (DINO
+weight-loading fix): also rebuild the deck charts and slide numbers from the new runs/L6/final.json (scripts/build_deck.py),
+re-export pitch/preview/, and describe the bug and its fix briefly and honestly in the report (methods or limitations). Write clearly and concretely. No em dashes.
 When done, inside `.lanes/L7`: DONE entry in worklog/L7.md, commit with prefix [L7], `git push origin HEAD:lane/L7-pitch`, stop.
 ```
 

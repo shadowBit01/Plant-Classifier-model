@@ -249,3 +249,8 @@ Append-only. One entry per dispatcher run. Format: AGENTS.md section 6.
 - Results: 0 merged, 0 dispatched, 0 blocked
 - Needs: none
 - Next: merge L7 when L7-b DONE, then check all_done for PROJECT COMPLETE.
+
+## 2026-11-15 19:58 | DISPATCH | DONE
+- Did: run 32: pulled main (clean); merge_lanes.py merged L7 (L7-b), 0 failed; dispatched L2-f (Antigravity A / antigravity gemini-4-argon, Local full-access, Plant-Classifier-model). No blocked items.
+- Needs: none
+- Next: L2-f re-encodes DINO block; then L3-d (re-fit) and L6-d (final table) dispatch after merge.

@@ -17,3 +17,11 @@ Append-only. One entry per dispatcher run. Format: AGENTS.md section 6.
 - Results: 5 lanes merged into main, 2 threads launched, 0 blocked
 - Needs: none
 - Next: L1-b/L4-b push their branches; next run merges them and dispatches L2-b, L3-b, L5-b (gated on L1-b/L2-b outputs).
+
+## 2026-11-15 06:06 | DISPATCH | DONE
+- Did: pulled main (clean); next_cards.py -> nothing to merge, dispatch or unblock. In flight: L1-b, L4-b. No stale, no blocked.
+- Files: worklog/DISPATCH.md
+- Tests: none (no merge)
+- Results: 0 merged, 0 dispatched, 0 blocked
+- Needs: none
+- Next: L1-b/L4-b finish and push; next run merges them and dispatches the cards they unblock.

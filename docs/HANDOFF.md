@@ -109,3 +109,4 @@ Never cut: baseline table, conformal sets, evidence panel, inat_india test split
   DINO cos 0.3-0.58, BioCLIP 1.00; live open-set rejects ~95%). Added L2-f (fix loader + test + recompute DINO block for
   all caches), L3-d (refit on cal), L6-d (re-run final.json + live e2e); L7-c now also depends on L6-d and refreshes
   the deck numbers. Reported results so far (vl600 1-photo .939) are effectively BioCLIP-only.
+- 2026-11-15 23:58 dispatcher: L2-f thread failed with "Antigravity quota reached" (fix_dino job died at 20:58, vl600_gallery shard 9/20); L2 provider -> Claude in PLAN.json, L2-f re-dispatched with --resume.

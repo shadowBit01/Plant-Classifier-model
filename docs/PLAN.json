@@ -12,7 +12,7 @@
    ]
   },
   "L2": {
-   "provider": "Antigravity A",
+   "provider": "Claude",
    "branch": "lane/L2-encoders",
    "project": "Plant-Classifier-model",
    "folder": ".lanes/L2",

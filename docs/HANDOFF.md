@@ -114,3 +114,8 @@ Never cut: baseline table, conformal sets, evidence panel, inat_india test split
   deadline: L7-c (report) now depends only on L7-b and runs in parallel with L2-f/L3-d/L6-d, writing numbers through a
   generated include; L7-d now depends on L7-c + L6-d and first refreshes all deck/report numbers. stale_minutes 230 -> 120
   so a dead thread is caught within 2 h (remaining cards are all < 2 h).
+- 2026-11-16 00:40 lead (human request): novelty is where the main marks are. Added L7-e (deps L7-c, runs in parallel
+  with L3-d/L6-d): report section "Related work and what is new" (prior approaches, capability matrix, reported prior
+  numbers kept separate, what we built on vs implemented vs new, verified citations only) + 2-3 deck slides incl. a
+  head-to-head chart on our vl600 test. L6-d now also writes a "baselines" block (BioCLIP 2 zero-shot, single-encoder
+  probes, kNN-only, concat probe, text-only, full 1/3 photos, CIs). L7-d now depends on L7-e + L6-d.

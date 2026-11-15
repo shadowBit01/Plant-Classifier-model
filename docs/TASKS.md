@@ -31,7 +31,7 @@ New tests go in new files you own; never edit someone else's test.
 | 3-6 | L1-b, then L2-b, L2-c (GPU), L1-c | inat_india manifests + embeddings cached; baseline JSONs in `runs/` |
 | 6-9 | Claude: L3-b then L6-a. Antigravity B: L4-b | **MVP: real pipeline answers an inat_india test photo** |
 | 9-16 | L6-b, L5-b | final table `runs/L6/final.json` |
-| wave 2 | L1-d (vl600), then L2-e + L4-c, L5-c; then L3-c, L6-c, L7-b (deck); DINO fix L2-f, then L3-d, L6-d, in parallel with L7-c (report); then L7-d (review + number refresh) | runs/L6/final.json has vl600 with CIs; report + reviewed deck |
+| wave 2 | L1-d (vl600), then L2-e + L4-c, L5-c; then L3-c, L6-c, L7-b (deck); DINO fix L2-f, then L3-d, L6-d, in parallel with L7-c (report), L7-e (related work + novelty); then L7-d (review + number refresh) | runs/L6/final.json has vl600 with CIs; report + reviewed deck |
 | 16-19 | fixes only | feature freeze at 19 |
 | 19-24 | Claude: L7-a builds `pitch/VanaLens.pptx` from `runs/L6/final.json` | human rehearses |
 
@@ -430,7 +430,10 @@ check -> runs/L6/e2e_vl600.json with the same procedure as L6-c (CIs by observat
 accuracy, open-set holdout, few-shot curve, geo prior beta refit on cal). Confirm that the live pipeline now matches the
 cache: e2e top-1 close to the cached test number and the unknown/reject rate on known test photos back to a normal
 level (it was ~95% because of the bug); if live and cache still disagree, find out why and fix it in your files or
-write BLOCKED with the exact cause. Lane tests must pass. DONE entry Results: the same metric list as L6-c with
+write BLOCKED with the exact cause. Also add a "baselines" block to final.json for vl600 test (same CIs by observation), all trained on gallery,
+tuned on cal only: B2 BioCLIP 2 zero-shot (runs/L2), BioCLIP-only linear probe, DINOv2-only linear probe,
+kNN-only, concatenated-feature probe without fusion, text-prototype-only (zero images), full VanaLens 1 photo
+and 3 photos. These feed the report's head-to-head novelty table (L7-e/L7-d). Lane tests must pass. DONE entry Results: the same metric list as L6-c with
 before -> after, and which metrics reach 95%.
 When done, inside `.lanes/L6`: DONE entry in worklog/L6.md, commit with prefix [L6], `git push origin HEAD:lane/L6-integration`, stop.
 ```
@@ -498,6 +501,54 @@ docs/HANDOFF.md 19:55) are re-running in parallel and will change the numbers: w
 runs/ files, but make every result number come from a small generated include (e.g. build_report.py reads runs/L6/final.json
 and runs/L3/ablation_*.json and fills the tables), so L7-d can refresh it with one rebuild; describe the bug and its
 fix briefly and honestly (methods or limitations). Write clearly and concretely. No em dashes.
+When done, inside `.lanes/L7`: DONE entry in worklog/L7.md, commit with prefix [L7], `git push origin HEAD:lane/L7-pitch`, stop.
+```
+
+**L7-e**
+```
+Lane L7, card L7-e. Setup, from the project root: `& $env:VANALENS_PY scripts/lane.py L7 --start L7-e` (bash: `"$VANALENS_PY" scripts/lane.py L7 --start L7-e`). It prepares your lane folder `.lanes/L7` (git worktree with the latest lane/L7-pitch and main merged in) and commits + pushes your STARTED entry. From then on work ONLY inside `.lanes/L7`: cd into it, read and edit only files under it, run python/pytest there with `$VANALENS_PY`. Never edit files outside `.lanes/L7` (AGENTS.md section 1).
+You are lane L7 (pitch). Read AGENTS.md, docs/RESEARCH.md (sections 3-6: datasets, baselines, research summary,
+recommended system), pitch/report/VanaLens_report.md, runs/L2/b2_vl600.json, runs/L3/ablation_*.json, runs/L6/final.json.
+The human says NOVELTY is where the main marks are: the report and deck must show clearly (a) which prior work and
+models exist for plant species identification, (b) which papers and models we built on, (c) what we implemented,
+(d) how good ours is against them, and (e) what is new or better in ours. Be convincing AND honest: examiners will
+check. Our encoders (BioCLIP 2, DINOv2) and the individual techniques (kNN, linear probe, conformal prediction, geo
+priors) are prior work; say so and cite them. The novelty is the system and the evidence, for example: an
+uncertainty-aware, evidence-backed pipeline that fuses several scorers on frozen foundation-model features with
+calibrated confidence, conformal "not sure" sets, open-set "not in catalog" rejection, hierarchical backoff, a GBIF
+location prior, multi-photo fusion and adding a species from a few photos with no retraining; India-focused coverage
+(vl600: ~600 species incl. cultivated and common Indian plants, which general benchmarks under-represent); a test split
+of observations after 2025-07-01 to reduce overlap with the encoders' training data; and the measured gain over the
+strongest open baseline on the SAME test set. Only claim what the code and runs/ support.
+Do:
+(1) Report: add a section "Related work and what is new" right after the Introduction (renumber), about 2-3 pages:
+ - Prior approaches, grouped: hand-crafted leaf features (e.g. LeafSnap); CNNs trained per dataset (Pl@ntNet-300K
+   ResNets, Indian medicinal leaf CNNs such as DIMPSAR / MED117 / HerbLife work: usually tens of species, clean leaf
+   photos, very high accuracy that does not transfer to field photos); production apps (Pl@ntNet, iNaturalist/Seek,
+   Google Lens: closed, single answer, no calibrated uncertainty); foundation models (CLIP, BioCLIP, BioCLIP 2,
+   DINOv2/DINOv3, PlantCLEF frozen-backbone + head winners); general VLMs (VLM4Bio: poor at open-ended species ID);
+   uncertainty work (split conformal prediction, open-set recognition); geo priors (Mac Aodha et al., SINR).
+ - A table "Prior work vs VanaLens": rows = representative systems/papers, columns = species scale, India coverage,
+   field photos, calibrated confidence, prediction sets, rejects unknown species, add species without retraining,
+   shows evidence, uses location, multi-photo. Fill only what the papers state; "not reported" where unknown.
+ - Reported accuracies of prior work ONLY with the dataset they were measured on, in a separate clearly labelled
+   table ("reported on their own datasets, not comparable"); never put them in the same column as our numbers.
+ - "What we built on" (BioCLIP 2, DINOv2, conformal, GBIF ...) vs "What we implemented" (list our own components and
+   scripts) vs "What is new" (4-6 numbered contributions, each tied to a measured number or a working feature).
+ - Every citation must be real: use the links in docs/RESEARCH.md; if you have web access, verify title, authors,
+   year and venue; if you cannot verify one, drop it. Never invent a paper, author or number.
+(2) Head-to-head on OUR vl600 test set: build the comparison table from the baselines rows in runs/L6/final.json
+   (L6-d adds them: BioCLIP 2 zero-shot, BioCLIP-only probe, DINOv2-only probe, kNN-only, concat probe, full VanaLens
+   1 and 3 photos, with 95% CIs). If they are not there yet, wire the table and a bar chart (with CI error bars) through
+   build_report.py placeholders from runs/ so L7-d's rebuild fills them; use runs/L2/b2_vl600.json and
+   runs/L3/ablation_vl600.json for what already exists. Also compare capabilities none of the baselines have
+   (set size at 90% coverage, ECE, open-set AUROC, few-shot new species).
+(3) Deck (scripts/build_deck.py, same clean theme): add 2-3 slides, deck may grow to 15 slides: "Prior work"
+   (compact capability matrix), "What is new in VanaLens" (contributions, max 4 bullets), "Head-to-head on the same
+   test set" (bar chart with CIs vs BioCLIP 2 zero-shot and single-encoder baselines). Speaker notes explain the
+   novelty in plain words. Re-export pitch/preview/ and check the new slides visually.
+(4) Rebuild the PDF; tests must pass; no em dashes.
+DONE entry Results: list of contributions claimed, number of verified citations, which comparison numbers are filled.
 When done, inside `.lanes/L7`: DONE entry in worklog/L7.md, commit with prefix [L7], `git push origin HEAD:lane/L7-pitch`, stop.
 ```
 

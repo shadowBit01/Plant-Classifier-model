@@ -58,13 +58,56 @@ def test_predict_shape_and_accuracy(lens, clusters):
     assert correct / len(range(0, len(yq), 3)) >= 0.9
 
 
-def test_multi_photo_sharpens(lens, clusters):
+def test_multi_photo_mean_log_probs(lens, clusters):
+    """Observation = renormalised exp(mean of calibrated log-probs) of its photos (L6-c), capped at MAX_PHOTOS."""
     yq = clusters["yq"]
-    idx = np.where(yq == 2)[0][:3]
-    one = lens.predict([f"q{idx[0]}.jpg"])
-    many = lens.predict([f"q{i}.jpg" for i in idx])
+    idx = np.where(yq == 2)[0][:4]
+    many = lens.predict([f"q{i}.jpg" for i in idx[:3]])
+    FT = lens.scores(clusters["Xq"][idx[:3]])
+    g = np.exp(np.log(FT + 1e-12).mean(0))
+    assert np.allclose(many.probs, g / g.sum(), atol=1e-9)
     assert many.top_k[0][0] == 2
-    assert many.probs[2] >= one.probs[2] - 1e-9
+    same = lens.predict([f"q{idx[0]}.jpg"] * 3)       # identical photos: mean == one photo (no overconfidence)
+    one = lens.predict([f"q{idx[0]}.jpg"])
+    assert np.allclose(same.probs, one.probs, atol=1e-9)
+    four = lens.predict([f"q{i}.jpg" for i in idx])   # 4th photo ignored
+    assert np.allclose(four.probs, many.probs) and pipeline.MAX_PHOTOS == 3
+
+
+def _toy_head(tmp_path, clusters, name, hidden):
+    from vanalens.scorers import HeadScorer
+    h = HeadScorer(C, hidden=hidden, epochs=5, device="cpu").fit(clusters["gallery"].X, clusters["gallery"].y)
+    path = tmp_path / f"{name}.npz"
+    h.save(path)
+    return h, str(path)
+
+
+def test_saved_head_and_ensemble_state(tmp_path, taxa, clusters, text_protos):
+    pytest.importorskip("torch")
+    lin, lp = _toy_head(tmp_path, clusters, "lin", 0)
+    mlp, mp = _toy_head(tmp_path, clusters, "mlp", 16)
+    st = dict(STATE, probe={"weights": lp, "C": 10.0}, heads={"probe": {"weights": lp}, "mlp": {"weights": mp}})
+    v = VanaLens(taxa, clusters["gallery"], st, text=text_protos, encoder=FakeEncoder({}))
+    assert v.config_name == "fused" and np.allclose(v.probe.predict_proba(clusters["Xq"]),
+                                                     lin.predict_proba(clusters["Xq"]))
+    ens = {"scorers": ["knn", "probe", "mlp", "text"], "weights": {"knn": 0.0, "probe": 0.2, "mlp": 0.6, "text": 0.2},
+           "T": 0.7, "qhat": 0.3, "kept": True}
+    v2 = VanaLens(taxa, clusters["gallery"], dict(st, final="ensemble", ensemble=ens), text=text_protos,
+                  encoder=FakeEncoder({}))
+    assert v2.config_name == "ensemble" and v2.names == ["probe", "mlp", "text"]
+    assert v2.T == 0.7 and v2.qhat == 0.3 and set(v2.heads) == {"probe", "mlp"}
+    X = clusters["Xq"]
+    from vanalens import fusion
+    exp = fusion.apply_temperature(fusion.fuse([lin.predict_proba(X), mlp.predict_proba(X),
+                                                v2.text.predict_proba(X)], [0.2, 0.6, 0.2]), 0.7)
+    assert np.allclose(v2.scores(X), exp)
+    v3 = VanaLens(taxa, clusters["gallery"], dict(st, final="ensemble", ensemble=dict(ens, kept=False)),
+                  text=text_protos, encoder=FakeEncoder({}))
+    assert v3.config_name == "fused" and v3.qhat == STATE["qhat"]
+    with pytest.raises(FileNotFoundError):            # ensemble names an mlp whose file is gone
+        VanaLens(taxa, clusters["gallery"], dict(st, final="ensemble", ensemble=ens,
+                                                 heads={"mlp": {"weights": str(tmp_path / "gone.npz")}}),
+                 text=text_protos, encoder=FakeEncoder({}))
 
 
 def test_text_scorer_skipped_without_protos(taxa, clusters):
@@ -194,3 +237,74 @@ def test_mock_pipeline_unchanged():
 def test_get_pipeline_mock(monkeypatch):
     monkeypatch.setenv("VANALENS_MOCK", "1")
     assert isinstance(pipeline.get_pipeline(), MockPipeline)
+
+
+# ------------------------------------------------------------------ scripts/final_table.py helpers (L6-c)
+def _ft():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("_ft", config.REPO_DIR / "scripts" / "final_table.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_bootstrap_ratio_by_observation():
+    ft = _ft()
+    groups = [f"g{i // 2}" for i in range(200)]          # 100 observations of 2 photos
+    rng = np.random.default_rng(0)
+    ok = rng.random(200) < 0.8
+    b = ft.Boot(groups, n_boot=500, seed=0)
+    assert b.W.shape == (500, 100) and np.all(b.W.sum(1) == 100)
+    gi = b.gidx(groups)
+    r = b.ratio(gi, ok)
+    assert r["value"] == round(ok.mean(), 4) and r["ci"][0] < r["value"] < r["ci"][1]
+    assert r["ci"][1] - r["ci"][0] < 0.2
+    const = b.ratio(gi, np.ones(200))
+    assert const == {"value": 1.0, "ci": [1.0, 1.0]}
+    mask = np.arange(200) < 100                          # subset ratio: num restricted to the mask
+    assert b.ratio(gi, ok & mask, mask)["value"] == round(ok[:100].mean(), 4)
+    assert ft.Boot(groups, n_boot=50, seed=0).W.tolist() == ft.Boot(groups, n_boot=50, seed=0).W.tolist()
+    y = np.repeat(np.arange(4), 50)
+    m = b.macro(gi, ok, y)
+    assert m["value"] == round(np.mean([ok[y == c].mean() for c in range(4)]), 4)
+
+
+def test_bootstrap_auroc():
+    ft = _ft()
+    groups = [str(i) for i in range(300)]
+    b = ft.Boot(groups, n_boot=200, seed=0)
+    gi = b.gidx(groups)
+    pos = np.arange(300) < 150
+    assert b.auroc(gi, pos.astype(float) + 0.0, pos)["value"] == 1.0
+    assert b.auroc(gi, np.zeros(300), pos)["value"] == 0.5     # all tied
+    rng = np.random.default_rng(1)
+    s = rng.normal(size=300) + pos
+    exp = np.mean([(a > c) + 0.5 * (a == c) for a in s[pos] for c in s[~pos]])
+    r = b.auroc(gi, s, pos)
+    assert abs(r["value"] - exp) < 1e-4 and r["ci"][0] < r["value"] < r["ci"][1]
+
+
+def test_selective_threshold_on_cal():
+    ft = _ft()
+    conf = np.array([0.99, 0.95, 0.9, 0.8, 0.7, 0.6, 0.5])
+    ok = np.array([1, 1, 1, 1, 0, 1, 0], dtype=bool)
+    assert ft.selective_threshold(conf, ok, 0.95) == 0.8       # top 4 all right; adding 0.7 drops to 0.8
+    assert ft.selective_threshold(conf, ok, 0.75) == 0.6       # 5/6 = 0.83 >= 0.75 > 5/7 = 0.71
+    assert ft.selective_threshold(conf, np.ones(7, bool), 0.95) == 0.5
+    assert ft.selective_threshold(conf, np.zeros(7, bool), 0.95) == float("inf")
+    tie = np.array([0.9, 0.9, 0.5])                           # never cut inside a run of tied confidences
+    assert ft.selective_threshold(tie, np.array([1, 0, 1], bool), 0.9) == float("inf")
+
+
+def test_backoff_arrays_match_hierarchy(taxa):
+    ft = _ft()
+    from vanalens import hierarchy
+    rng = np.random.default_rng(2)
+    P = rng.dirichlet(np.full(C, 0.4), size=200)
+    y = rng.integers(0, C, size=200)
+    answered, correct, sp = ft.backoff_arrays(P, taxa, y)
+    for i in range(200):
+        rank, label, _ = hierarchy.backoff(P[i], taxa, config.BACKOFF_TAU)
+        assert answered[i] == (rank != "unknown") and sp[i] == (rank == "species")
+        truth = {"species": taxa[y[i]].species, "genus": taxa[y[i]].genus, "family": taxa[y[i]].family}
+        assert correct[i] == (rank != "unknown" and label == truth[rank])

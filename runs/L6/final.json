@@ -1,10 +1,16 @@
 {
  "alpha": 0.1,
+ "target": 0.95,
+ "n_boot": 1000,
+ "seed": 0,
  "columns": [
-  "n",
   "top1",
   "top5",
   "macro_top1",
+  "genus_top1",
+  "family_top1",
+  "backoff_acc",
+  "species_share",
   "coverage",
   "mean_set_size"
  ],
@@ -19,8 +25,13 @@
     "top1": null,
     "top5": null,
     "macro_top1": null,
+    "genus_top1": null,
+    "family_top1": null,
+    "backoff_acc": null,
+    "species_share": null,
     "coverage": null,
-    "mean_set_size": null
+    "mean_set_size": null,
+    "ci": {}
    },
    {
     "method": "B1 BioCLIP zero-shot",
@@ -31,32 +42,76 @@
     "top1": null,
     "top5": null,
     "macro_top1": null,
+    "genus_top1": null,
+    "family_top1": null,
+    "backoff_acc": null,
+    "species_share": null,
     "coverage": null,
-    "mean_set_size": null
+    "mean_set_size": null,
+    "ci": {}
    },
    {
     "method": "B2 BioCLIP 2 kNN",
     "source": "runs/L2/b2_inat_india.json",
     "status": "ok",
-    "note": "",
+    "note": "point value from the result file (no per-sample predictions: no CI)",
     "n": 558,
     "top1": 0.9355,
     "top5": 0.991,
     "macro_top1": 0.9278,
+    "genus_top1": 0.9409,
+    "family_top1": 0.9427,
+    "backoff_acc": null,
+    "species_share": null,
     "coverage": null,
-    "mean_set_size": null
+    "mean_set_size": null,
+    "ci": {}
    },
    {
     "method": "B3 linear probe",
-    "source": "runs/L3/ablation_inat_india.json#probe",
+    "source": "cache recompute; runs/L3/ablation_inat_india.json#probe",
     "status": "ok",
-    "note": "",
+    "note": "L3 top-1 0.8889",
     "n": 558,
-    "top1": 0.9211,
-    "top5": 0.9875,
-    "macro_top1": 0.9057,
+    "top1": 0.8889,
+    "top5": 0.9785,
+    "macro_top1": 0.8699,
+    "genus_top1": 0.8943,
+    "family_top1": 0.9014,
+    "backoff_acc": 0.9928,
+    "species_share": 0.1523,
     "coverage": null,
-    "mean_set_size": null
+    "mean_set_size": null,
+    "ci": {
+     "top1": [
+      0.8638,
+      0.914
+     ],
+     "top5": [
+      0.9642,
+      0.9892
+     ],
+     "macro_top1": [
+      0.8414,
+      0.8972
+     ],
+     "genus_top1": [
+      0.8692,
+      0.9176
+     ],
+     "family_top1": [
+      0.8763,
+      0.9247
+     ],
+     "backoff_acc": [
+      0.9767,
+      1.0
+     ],
+     "species_share": [
+      0.1219,
+      0.181
+     ]
+    }
    },
    {
     "method": "B4 VLM",
@@ -67,104 +122,559 @@
     "top1": null,
     "top5": null,
     "macro_top1": null,
+    "genus_top1": null,
+    "family_top1": null,
+    "backoff_acc": null,
+    "species_share": null,
     "coverage": null,
-    "mean_set_size": null
+    "mean_set_size": null,
+    "ci": {}
    },
    {
     "method": "knn",
-    "source": "runs/L3/ablation_inat_india.json#knn",
+    "source": "cache recompute; runs/L3/ablation_inat_india.json#knn",
     "status": "ok",
-    "note": "",
+    "note": "L3 top-1 0.8118",
     "n": 558,
     "top1": 0.8118,
     "top5": 0.9427,
     "macro_top1": 0.7956,
+    "genus_top1": 0.8262,
+    "family_top1": 0.8297,
+    "backoff_acc": 0.9502,
+    "species_share": 0.6308,
     "coverage": null,
-    "mean_set_size": null
+    "mean_set_size": null,
+    "ci": {
+     "top1": [
+      0.7778,
+      0.8423
+     ],
+     "top5": [
+      0.9229,
+      0.9606
+     ],
+     "macro_top1": [
+      0.7633,
+      0.8282
+     ],
+     "genus_top1": [
+      0.7921,
+      0.8548
+     ],
+     "family_top1": [
+      0.7957,
+      0.8585
+     ],
+     "backoff_acc": [
+      0.9281,
+      0.9697
+     ],
+     "species_share": [
+      0.5896,
+      0.6703
+     ]
+    }
    },
    {
     "method": "probe",
-    "source": "runs/L3/ablation_inat_india.json#probe",
+    "source": "cache recompute; runs/L3/ablation_inat_india.json#probe",
     "status": "ok",
-    "note": "",
+    "note": "L3 top-1 0.8889",
     "n": 558,
-    "top1": 0.9211,
-    "top5": 0.9875,
-    "macro_top1": 0.9057,
+    "top1": 0.8889,
+    "top5": 0.9785,
+    "macro_top1": 0.8699,
+    "genus_top1": 0.8943,
+    "family_top1": 0.9014,
+    "backoff_acc": 0.9928,
+    "species_share": 0.1523,
     "coverage": null,
-    "mean_set_size": null
+    "mean_set_size": null,
+    "ci": {
+     "top1": [
+      0.8638,
+      0.914
+     ],
+     "top5": [
+      0.9642,
+      0.9892
+     ],
+     "macro_top1": [
+      0.8414,
+      0.8972
+     ],
+     "genus_top1": [
+      0.8692,
+      0.9176
+     ],
+     "family_top1": [
+      0.8763,
+      0.9247
+     ],
+     "backoff_acc": [
+      0.9767,
+      1.0
+     ],
+     "species_share": [
+      0.1219,
+      0.181
+     ]
+    }
+   },
+   {
+    "method": "mlp",
+    "source": "cache recompute; runs/L3/ablation_inat_india.json#mlp",
+    "status": "ok",
+    "note": "L3 top-1 0.905",
+    "n": 558,
+    "top1": 0.905,
+    "top5": 0.9875,
+    "macro_top1": 0.8862,
+    "genus_top1": 0.9194,
+    "family_top1": 0.9247,
+    "backoff_acc": 0.9971,
+    "species_share": 0.5771,
+    "coverage": null,
+    "mean_set_size": null,
+    "ci": {
+     "top1": [
+      0.8799,
+      0.9284
+     ],
+     "top5": [
+      0.9767,
+      0.9964
+     ],
+     "macro_top1": [
+      0.859,
+      0.9145
+     ],
+     "genus_top1": [
+      0.8961,
+      0.9409
+     ],
+     "family_top1": [
+      0.9014,
+      0.9462
+     ],
+     "backoff_acc": [
+      0.991,
+      1.0
+     ],
+     "species_share": [
+      0.5376,
+      0.6201
+     ]
+    }
    },
    {
     "method": "text",
-    "source": "runs/L3/ablation_inat_india.json#text",
+    "source": "cache recompute; runs/L3/ablation_inat_india.json#text",
     "status": "ok",
-    "note": "",
+    "note": "L3 top-1 0.9606",
     "n": 558,
-    "top1": 0.4982,
-    "top5": 0.991,
-    "macro_top1": 0.4844,
+    "top1": 0.9606,
+    "top5": 0.9964,
+    "macro_top1": 0.9514,
+    "genus_top1": 0.9659,
+    "family_top1": 0.9677,
+    "backoff_acc": 0.9815,
+    "species_share": 0.948,
     "coverage": null,
-    "mean_set_size": null
+    "mean_set_size": null,
+    "ci": {
+     "top1": [
+      0.9444,
+      0.9767
+     ],
+     "top5": [
+      0.991,
+      1.0
+     ],
+     "macro_top1": [
+      0.9302,
+      0.9714
+     ],
+     "genus_top1": [
+      0.9498,
+      0.9803
+     ],
+     "family_top1": [
+      0.9516,
+      0.9821
+     ],
+     "backoff_acc": [
+      0.9698,
+      0.9908
+     ],
+     "species_share": [
+      0.9283,
+      0.9677
+     ]
+    }
    },
    {
     "method": "fused",
-    "source": "runs/L3/ablation_inat_india.json#fused",
+    "source": "cache recompute; runs/L3/ablation_inat_india.json#fused",
     "status": "ok",
-    "note": "",
+    "note": "L3 top-1 0.9659",
     "n": 558,
-    "top1": 0.9534,
+    "top1": 0.9659,
     "top5": 0.9946,
-    "macro_top1": 0.9418,
+    "macro_top1": 0.9567,
+    "genus_top1": 0.9713,
+    "family_top1": 0.9731,
+    "backoff_acc": 0.9906,
+    "species_share": 0.9427,
     "coverage": null,
-    "mean_set_size": null
+    "mean_set_size": null,
+    "ci": {
+     "top1": [
+      0.9498,
+      0.9803
+     ],
+     "top5": [
+      0.9875,
+      1.0
+     ],
+     "macro_top1": [
+      0.9357,
+      0.9751
+     ],
+     "genus_top1": [
+      0.957,
+      0.9839
+     ],
+     "family_top1": [
+      0.9588,
+      0.9857
+     ],
+     "backoff_acc": [
+      0.9814,
+      0.9981
+     ],
+     "species_share": [
+      0.9229,
+      0.9624
+     ]
+    }
    },
    {
     "method": "fused+T",
-    "source": "runs/L3/ablation_inat_india.json#fused+T",
+    "source": "cache recompute; runs/L3/ablation_inat_india.json#fused+T",
     "status": "ok",
-    "note": "",
+    "note": "L3 top-1 0.9659",
     "n": 558,
-    "top1": 0.9534,
+    "top1": 0.9659,
     "top5": 0.9946,
-    "macro_top1": 0.9418,
+    "macro_top1": 0.9567,
+    "genus_top1": 0.9713,
+    "family_top1": 0.9731,
+    "backoff_acc": 0.9799,
+    "species_share": 0.9713,
     "coverage": null,
-    "mean_set_size": null
+    "mean_set_size": null,
+    "ci": {
+     "top1": [
+      0.9498,
+      0.9803
+     ],
+     "top5": [
+      0.9875,
+      1.0
+     ],
+     "macro_top1": [
+      0.9357,
+      0.9751
+     ],
+     "genus_top1": [
+      0.957,
+      0.9839
+     ],
+     "family_top1": [
+      0.9588,
+      0.9857
+     ],
+     "backoff_acc": [
+      0.9672,
+      0.9908
+     ],
+     "species_share": [
+      0.957,
+      0.9857
+     ]
+    }
    },
    {
     "method": "fused+T+sets",
-    "source": "runs/L3/ablation_inat_india.json#fused+T+sets",
+    "source": "cache recompute; runs/L3/ablation_inat_india.json#fused+T+sets",
     "status": "ok",
-    "note": "",
+    "note": "L3 top-1 0.9659",
     "n": 558,
-    "top1": 0.9534,
+    "top1": 0.9659,
     "top5": 0.9946,
-    "macro_top1": 0.9418,
-    "coverage": 0.9534,
-    "mean_set_size": 1.0
+    "macro_top1": 0.9567,
+    "genus_top1": 0.9713,
+    "family_top1": 0.9731,
+    "backoff_acc": 0.9799,
+    "species_share": 0.9713,
+    "coverage": 0.9659,
+    "mean_set_size": 1.0,
+    "ci": {
+     "top1": [
+      0.9498,
+      0.9803
+     ],
+     "top5": [
+      0.9875,
+      1.0
+     ],
+     "macro_top1": [
+      0.9357,
+      0.9751
+     ],
+     "genus_top1": [
+      0.957,
+      0.9839
+     ],
+     "family_top1": [
+      0.9588,
+      0.9857
+     ],
+     "backoff_acc": [
+      0.9672,
+      0.9908
+     ],
+     "species_share": [
+      0.957,
+      0.9857
+     ],
+     "coverage": [
+      0.9498,
+      0.9803
+     ],
+     "mean_set_size": [
+      1.0,
+      1.0
+     ]
+    }
    },
    {
-    "method": "fused+T+sets (rerun)",
-    "source": "VanaLens.predict, cached emb, beta=0",
+    "method": "ensemble",
+    "source": "cache recompute; runs/L3/ablation_inat_india.json#ensemble",
     "status": "ok",
-    "note": "current cache (text protos rebuilt after L3 ablation); baseline for the geo step",
+    "note": "L3 top-1 0.9677; final config: ensemble",
     "n": 558,
-    "top1": 0.957,
-    "top5": 0.9964,
-    "macro_top1": 0.9452,
-    "coverage": 0.957,
-    "mean_set_size": 1.0
+    "top1": 0.9677,
+    "top5": 0.9946,
+    "macro_top1": 0.9605,
+    "genus_top1": 0.9731,
+    "family_top1": 0.9749,
+    "backoff_acc": 0.9799,
+    "species_share": 0.9731,
+    "coverage": 0.9677,
+    "mean_set_size": 1.0,
+    "ci": {
+     "top1": [
+      0.9534,
+      0.9821
+     ],
+     "top5": [
+      0.9875,
+      1.0
+     ],
+     "macro_top1": [
+      0.942,
+      0.9779
+     ],
+     "genus_top1": [
+      0.9588,
+      0.9857
+     ],
+     "family_top1": [
+      0.9606,
+      0.9875
+     ],
+     "backoff_acc": [
+      0.9672,
+      0.9908
+     ],
+     "species_share": [
+      0.9588,
+      0.9857
+     ],
+     "coverage": [
+      0.9534,
+      0.9821
+     ],
+     "mean_set_size": [
+      1.0,
+      1.0
+     ]
+    }
+   },
+   {
+    "method": "VanaLens 1 photo (no geo)",
+    "source": "VanaLens.combine on cached emb (ensemble, T=0.559, qhat=0.413)",
+    "status": "ok",
+    "note": "per photo",
+    "n": 558,
+    "top1": 0.9677,
+    "top5": 0.9946,
+    "macro_top1": 0.9605,
+    "genus_top1": 0.9731,
+    "family_top1": 0.9749,
+    "backoff_acc": 0.9799,
+    "species_share": 0.9731,
+    "coverage": 0.9677,
+    "mean_set_size": 1.0,
+    "ci": {
+     "top1": [
+      0.9534,
+      0.9821
+     ],
+     "top5": [
+      0.9875,
+      1.0
+     ],
+     "macro_top1": [
+      0.942,
+      0.9779
+     ],
+     "genus_top1": [
+      0.9588,
+      0.9857
+     ],
+     "family_top1": [
+      0.9606,
+      0.9875
+     ],
+     "backoff_acc": [
+      0.9672,
+      0.9908
+     ],
+     "species_share": [
+      0.9588,
+      0.9857
+     ],
+     "coverage": [
+      0.9534,
+      0.9821
+     ],
+     "mean_set_size": [
+      1.0,
+      1.0
+     ]
+    }
    },
    {
     "method": "+ geo prior",
-    "source": "VanaLens.predict, cached emb, beta=0.25",
+    "source": "VanaLens.combine on cached emb (ensemble, T=0.559, qhat=0.413), beta=0.75",
     "status": "ok",
-    "note": "558/558 photos with coords",
+    "note": "per photo; 558/558 photos with coords",
     "n": 558,
-    "top1": 0.957,
-    "top5": 0.9964,
-    "macro_top1": 0.9433,
-    "coverage": 0.957,
-    "mean_set_size": 1.0
+    "top1": 0.9606,
+    "top5": 0.9946,
+    "macro_top1": 0.9467,
+    "genus_top1": 0.9659,
+    "family_top1": 0.9677,
+    "backoff_acc": 0.9797,
+    "species_share": 0.9677,
+    "coverage": 0.9606,
+    "mean_set_size": 1.0,
+    "ci": {
+     "top1": [
+      0.9444,
+      0.9767
+     ],
+     "top5": [
+      0.9875,
+      1.0
+     ],
+     "macro_top1": [
+      0.9245,
+      0.967
+     ],
+     "genus_top1": [
+      0.9498,
+      0.9803
+     ],
+     "family_top1": [
+      0.9516,
+      0.9821
+     ],
+     "backoff_acc": [
+      0.9671,
+      0.9908
+     ],
+     "species_share": [
+      0.9534,
+      0.9821
+     ],
+     "coverage": [
+      0.9444,
+      0.9767
+     ],
+     "mean_set_size": [
+      1.0,
+      1.0
+     ]
+    }
+   },
+   {
+    "method": "VanaLens up to 3 photos + geo",
+    "source": "VanaLens.combine on cached emb (ensemble, T=0.559, qhat=0.413), beta=0.75",
+    "status": "ok",
+    "note": "per observation; 0/558 observations have 2-3 photos, mean 1.00 photos",
+    "n": 558,
+    "top1": 0.9606,
+    "top5": 0.9946,
+    "macro_top1": 0.9467,
+    "genus_top1": 0.9659,
+    "family_top1": 0.9677,
+    "backoff_acc": 0.9797,
+    "species_share": 0.9677,
+    "coverage": 0.9606,
+    "mean_set_size": 1.0,
+    "ci": {
+     "top1": [
+      0.9444,
+      0.9767
+     ],
+     "top5": [
+      0.9875,
+      1.0
+     ],
+     "macro_top1": [
+      0.9245,
+      0.967
+     ],
+     "genus_top1": [
+      0.9498,
+      0.9803
+     ],
+     "family_top1": [
+      0.9516,
+      0.9821
+     ],
+     "backoff_acc": [
+      0.9671,
+      0.9908
+     ],
+     "species_share": [
+      0.9534,
+      0.9821
+     ],
+     "coverage": [
+      0.9444,
+      0.9767
+     ],
+     "mean_set_size": [
+      1.0,
+      1.0
+     ]
+    }
    },
    {
     "method": "+ reranker",
@@ -175,13 +685,1166 @@
     "top1": null,
     "top5": null,
     "macro_top1": null,
+    "genus_top1": null,
+    "family_top1": null,
+    "backoff_acc": null,
+    "species_share": null,
     "coverage": null,
-    "mean_set_size": null
+    "mean_set_size": null,
+    "ci": {}
+   }
+  ],
+  "vl600": [
+   {
+    "method": "B0 PlantNet API",
+    "source": "runs/L1/b0_vl600.json",
+    "status": "not run",
+    "note": "no result file",
+    "n": null,
+    "top1": null,
+    "top5": null,
+    "macro_top1": null,
+    "genus_top1": null,
+    "family_top1": null,
+    "backoff_acc": null,
+    "species_share": null,
+    "coverage": null,
+    "mean_set_size": null,
+    "ci": {}
+   },
+   {
+    "method": "B1 BioCLIP zero-shot",
+    "source": "runs/L2/b1_vl600.json",
+    "status": "not run",
+    "note": "no result file",
+    "n": null,
+    "top1": null,
+    "top5": null,
+    "macro_top1": null,
+    "genus_top1": null,
+    "family_top1": null,
+    "backoff_acc": null,
+    "species_share": null,
+    "coverage": null,
+    "mean_set_size": null,
+    "ci": {}
+   },
+   {
+    "method": "B2 BioCLIP 2 kNN",
+    "source": "runs/L2/b2_vl600.json",
+    "status": "ok",
+    "note": "point value from the result file (no per-sample predictions: no CI)",
+    "n": 12831,
+    "top1": 0.873,
+    "top5": 0.9537,
+    "macro_top1": 0.8775,
+    "genus_top1": 0.8931,
+    "family_top1": 0.9195,
+    "backoff_acc": null,
+    "species_share": null,
+    "coverage": null,
+    "mean_set_size": null,
+    "ci": {}
+   },
+   {
+    "method": "B3 linear probe",
+    "source": "cache recompute; runs/L3/ablation_vl600.json#probe",
+    "status": "ok",
+    "note": "L3 top-1 0.924",
+    "n": 12831,
+    "top1": 0.924,
+    "top5": 0.9759,
+    "macro_top1": 0.9278,
+    "genus_top1": 0.9351,
+    "family_top1": 0.9477,
+    "backoff_acc": 0.991,
+    "species_share": 0.8048,
+    "coverage": null,
+    "mean_set_size": null,
+    "ci": {
+     "top1": [
+      0.9185,
+      0.9296
+     ],
+     "top5": [
+      0.9728,
+      0.9788
+     ],
+     "macro_top1": [
+      0.9237,
+      0.9328
+     ],
+     "genus_top1": [
+      0.9302,
+      0.9403
+     ],
+     "family_top1": [
+      0.9431,
+      0.9523
+     ],
+     "backoff_acc": [
+      0.9888,
+      0.9928
+     ],
+     "species_share": [
+      0.7967,
+      0.8132
+     ]
+    }
+   },
+   {
+    "method": "B4 VLM",
+    "source": "runs/L4/b4_vl600.json",
+    "status": "not run",
+    "note": "no result file",
+    "n": null,
+    "top1": null,
+    "top5": null,
+    "macro_top1": null,
+    "genus_top1": null,
+    "family_top1": null,
+    "backoff_acc": null,
+    "species_share": null,
+    "coverage": null,
+    "mean_set_size": null,
+    "ci": {}
+   },
+   {
+    "method": "knn",
+    "source": "cache recompute; runs/L3/ablation_vl600.json#knn",
+    "status": "ok",
+    "note": "L3 top-1 0.9066",
+    "n": 12831,
+    "top1": 0.9066,
+    "top5": 0.9596,
+    "macro_top1": 0.9108,
+    "genus_top1": 0.9198,
+    "family_top1": 0.9345,
+    "backoff_acc": 0.972,
+    "species_share": 0.8744,
+    "coverage": null,
+    "mean_set_size": null,
+    "ci": {
+     "top1": [
+      0.9002,
+      0.9121
+     ],
+     "top5": [
+      0.9556,
+      0.9632
+     ],
+     "macro_top1": [
+      0.9064,
+      0.9161
+     ],
+     "genus_top1": [
+      0.9141,
+      0.9252
+     ],
+     "family_top1": [
+      0.9292,
+      0.9394
+     ],
+     "backoff_acc": [
+      0.9685,
+      0.9752
+     ],
+     "species_share": [
+      0.8672,
+      0.8818
+     ]
+    }
+   },
+   {
+    "method": "probe",
+    "source": "cache recompute; runs/L3/ablation_vl600.json#probe",
+    "status": "ok",
+    "note": "L3 top-1 0.924",
+    "n": 12831,
+    "top1": 0.924,
+    "top5": 0.9759,
+    "macro_top1": 0.9278,
+    "genus_top1": 0.9351,
+    "family_top1": 0.9477,
+    "backoff_acc": 0.991,
+    "species_share": 0.8048,
+    "coverage": null,
+    "mean_set_size": null,
+    "ci": {
+     "top1": [
+      0.9185,
+      0.9296
+     ],
+     "top5": [
+      0.9728,
+      0.9788
+     ],
+     "macro_top1": [
+      0.9237,
+      0.9328
+     ],
+     "genus_top1": [
+      0.9302,
+      0.9403
+     ],
+     "family_top1": [
+      0.9431,
+      0.9523
+     ],
+     "backoff_acc": [
+      0.9888,
+      0.9928
+     ],
+     "species_share": [
+      0.7967,
+      0.8132
+     ]
+    }
+   },
+   {
+    "method": "mlp",
+    "source": "cache recompute; runs/L3/ablation_vl600.json#mlp",
+    "status": "ok",
+    "note": "L3 top-1 0.9288",
+    "n": 12831,
+    "top1": 0.9288,
+    "top5": 0.9754,
+    "macro_top1": 0.9323,
+    "genus_top1": 0.9388,
+    "family_top1": 0.9491,
+    "backoff_acc": 0.989,
+    "species_share": 0.8318,
+    "coverage": null,
+    "mean_set_size": null,
+    "ci": {
+     "top1": [
+      0.9235,
+      0.9338
+     ],
+     "top5": [
+      0.9721,
+      0.9784
+     ],
+     "macro_top1": [
+      0.9282,
+      0.9371
+     ],
+     "genus_top1": [
+      0.934,
+      0.9439
+     ],
+     "family_top1": [
+      0.9448,
+      0.9534
+     ],
+     "backoff_acc": [
+      0.9867,
+      0.9913
+     ],
+     "species_share": [
+      0.8236,
+      0.8394
+     ]
+    }
+   },
+   {
+    "method": "text",
+    "source": "cache recompute; runs/L3/ablation_vl600.json#text",
+    "status": "ok",
+    "note": "L3 top-1 0.9005",
+    "n": 12831,
+    "top1": 0.9005,
+    "top5": 0.9641,
+    "macro_top1": 0.9043,
+    "genus_top1": 0.9189,
+    "family_top1": 0.9384,
+    "backoff_acc": 0.9605,
+    "species_share": 0.8887,
+    "coverage": null,
+    "mean_set_size": null,
+    "ci": {
+     "top1": [
+      0.8942,
+      0.9064
+     ],
+     "top5": [
+      0.9601,
+      0.9676
+     ],
+     "macro_top1": [
+      0.9001,
+      0.9092
+     ],
+     "genus_top1": [
+      0.913,
+      0.924
+     ],
+     "family_top1": [
+      0.9334,
+      0.9433
+     ],
+     "backoff_acc": [
+      0.9565,
+      0.9641
+     ],
+     "species_share": [
+      0.8821,
+      0.8949
+     ]
+    }
+   },
+   {
+    "method": "fused",
+    "source": "cache recompute; runs/L3/ablation_vl600.json#fused",
+    "status": "ok",
+    "note": "L3 top-1 0.9301",
+    "n": 12831,
+    "top1": 0.9301,
+    "top5": 0.9792,
+    "macro_top1": 0.9331,
+    "genus_top1": 0.9409,
+    "family_top1": 0.952,
+    "backoff_acc": 0.9876,
+    "species_share": 0.854,
+    "coverage": null,
+    "mean_set_size": null,
+    "ci": {
+     "top1": [
+      0.9251,
+      0.9353
+     ],
+     "top5": [
+      0.9764,
+      0.9819
+     ],
+     "macro_top1": [
+      0.9292,
+      0.9377
+     ],
+     "genus_top1": [
+      0.9363,
+      0.9458
+     ],
+     "family_top1": [
+      0.9476,
+      0.9562
+     ],
+     "backoff_acc": [
+      0.9852,
+      0.9898
+     ],
+     "species_share": [
+      0.8466,
+      0.8617
+     ]
+    }
+   },
+   {
+    "method": "fused+T",
+    "source": "cache recompute; runs/L3/ablation_vl600.json#fused+T",
+    "status": "ok",
+    "note": "L3 top-1 0.9301",
+    "n": 12831,
+    "top1": 0.9301,
+    "top5": 0.9792,
+    "macro_top1": 0.9331,
+    "genus_top1": 0.9409,
+    "family_top1": 0.952,
+    "backoff_acc": 0.9672,
+    "species_share": 0.9322,
+    "coverage": null,
+    "mean_set_size": null,
+    "ci": {
+     "top1": [
+      0.9251,
+      0.9353
+     ],
+     "top5": [
+      0.9764,
+      0.9819
+     ],
+     "macro_top1": [
+      0.9292,
+      0.9377
+     ],
+     "genus_top1": [
+      0.9363,
+      0.9458
+     ],
+     "family_top1": [
+      0.9476,
+      0.9562
+     ],
+     "backoff_acc": [
+      0.9638,
+      0.9706
+     ],
+     "species_share": [
+      0.9268,
+      0.9374
+     ]
+    }
+   },
+   {
+    "method": "fused+T+sets",
+    "source": "cache recompute; runs/L3/ablation_vl600.json#fused+T+sets",
+    "status": "ok",
+    "note": "L3 top-1 0.9301",
+    "n": 12831,
+    "top1": 0.9301,
+    "top5": 0.9792,
+    "macro_top1": 0.9331,
+    "genus_top1": 0.9409,
+    "family_top1": 0.952,
+    "backoff_acc": 0.9672,
+    "species_share": 0.9322,
+    "coverage": 0.9301,
+    "mean_set_size": 1.0,
+    "ci": {
+     "top1": [
+      0.9251,
+      0.9353
+     ],
+     "top5": [
+      0.9764,
+      0.9819
+     ],
+     "macro_top1": [
+      0.9292,
+      0.9377
+     ],
+     "genus_top1": [
+      0.9363,
+      0.9458
+     ],
+     "family_top1": [
+      0.9476,
+      0.9562
+     ],
+     "backoff_acc": [
+      0.9638,
+      0.9706
+     ],
+     "species_share": [
+      0.9268,
+      0.9374
+     ],
+     "coverage": [
+      0.9251,
+      0.9353
+     ],
+     "mean_set_size": [
+      1.0,
+      1.0
+     ]
+    }
+   },
+   {
+    "method": "ensemble",
+    "source": "cache recompute; runs/L3/ablation_vl600.json#ensemble",
+    "status": "ok",
+    "note": "L3 top-1 0.9328; final config: ensemble",
+    "n": 12831,
+    "top1": 0.9328,
+    "top5": 0.979,
+    "macro_top1": 0.9358,
+    "genus_top1": 0.9427,
+    "family_top1": 0.9525,
+    "backoff_acc": 0.968,
+    "species_share": 0.938,
+    "coverage": 0.9328,
+    "mean_set_size": 1.0,
+    "ci": {
+     "top1": [
+      0.9277,
+      0.9377
+     ],
+     "top5": [
+      0.9761,
+      0.9818
+     ],
+     "macro_top1": [
+      0.9319,
+      0.9404
+     ],
+     "genus_top1": [
+      0.938,
+      0.9474
+     ],
+     "family_top1": [
+      0.9484,
+      0.9566
+     ],
+     "backoff_acc": [
+      0.9644,
+      0.9713
+     ],
+     "species_share": [
+      0.9333,
+      0.9425
+     ],
+     "coverage": [
+      0.9277,
+      0.9377
+     ],
+     "mean_set_size": [
+      1.0,
+      1.0
+     ]
+    }
+   },
+   {
+    "method": "VanaLens 1 photo (no geo)",
+    "source": "VanaLens.combine on cached emb (ensemble, T=0.641, qhat=0.164)",
+    "status": "ok",
+    "note": "per photo",
+    "n": 12831,
+    "top1": 0.9328,
+    "top5": 0.979,
+    "macro_top1": 0.9358,
+    "genus_top1": 0.9427,
+    "family_top1": 0.9525,
+    "backoff_acc": 0.968,
+    "species_share": 0.938,
+    "coverage": 0.9328,
+    "mean_set_size": 1.0,
+    "ci": {
+     "top1": [
+      0.9277,
+      0.9377
+     ],
+     "top5": [
+      0.9761,
+      0.9818
+     ],
+     "macro_top1": [
+      0.9319,
+      0.9404
+     ],
+     "genus_top1": [
+      0.938,
+      0.9474
+     ],
+     "family_top1": [
+      0.9484,
+      0.9566
+     ],
+     "backoff_acc": [
+      0.9644,
+      0.9713
+     ],
+     "species_share": [
+      0.9333,
+      0.9425
+     ],
+     "coverage": [
+      0.9277,
+      0.9377
+     ],
+     "mean_set_size": [
+      1.0,
+      1.0
+     ]
+    }
+   },
+   {
+    "method": "+ geo prior",
+    "source": "VanaLens.combine on cached emb (ensemble, T=0.641, qhat=0.164), beta=0.5",
+    "status": "ok",
+    "note": "per photo; 12828/12831 photos with coords",
+    "n": 12831,
+    "top1": 0.9386,
+    "top5": 0.9818,
+    "macro_top1": 0.9416,
+    "genus_top1": 0.9474,
+    "family_top1": 0.956,
+    "backoff_acc": 0.9684,
+    "species_share": 0.9461,
+    "coverage": 0.9386,
+    "mean_set_size": 1.0,
+    "ci": {
+     "top1": [
+      0.9337,
+      0.9434
+     ],
+     "top5": [
+      0.9791,
+      0.9842
+     ],
+     "macro_top1": [
+      0.9378,
+      0.946
+     ],
+     "genus_top1": [
+      0.9428,
+      0.952
+     ],
+     "family_top1": [
+      0.9519,
+      0.9603
+     ],
+     "backoff_acc": [
+      0.9648,
+      0.9718
+     ],
+     "species_share": [
+      0.9416,
+      0.9503
+     ],
+     "coverage": [
+      0.9337,
+      0.9434
+     ],
+     "mean_set_size": [
+      1.0,
+      1.0
+     ]
+    }
+   },
+   {
+    "method": "VanaLens up to 3 photos + geo",
+    "source": "VanaLens.combine on cached emb (ensemble, T=0.641, qhat=0.164), beta=0.5",
+    "status": "ok",
+    "note": "per observation; 2519/9097 observations have 2-3 photos, mean 1.41 photos",
+    "n": 9097,
+    "top1": 0.9577,
+    "top5": 0.9904,
+    "macro_top1": 0.9576,
+    "genus_top1": 0.9656,
+    "family_top1": 0.9715,
+    "backoff_acc": 0.9792,
+    "species_share": 0.9601,
+    "coverage": 0.9577,
+    "mean_set_size": 1.0,
+    "ci": {
+     "top1": [
+      0.9536,
+      0.9617
+     ],
+     "top5": [
+      0.9885,
+      0.9924
+     ],
+     "macro_top1": [
+      0.9537,
+      0.9615
+     ],
+     "genus_top1": [
+      0.9617,
+      0.9692
+     ],
+     "family_top1": [
+      0.9678,
+      0.9749
+     ],
+     "backoff_acc": [
+      0.9761,
+      0.9821
+     ],
+     "species_share": [
+      0.956,
+      0.9639
+     ],
+     "coverage": [
+      0.9536,
+      0.9617
+     ],
+     "mean_set_size": [
+      1.0,
+      1.0
+     ]
+    }
+   },
+   {
+    "method": "+ reranker",
+    "source": "VanaLens.predict",
+    "status": "not run",
+    "note": "VANALENS_LLM_KEY not set",
+    "n": null,
+    "top1": null,
+    "top5": null,
+    "macro_top1": null,
+    "genus_top1": null,
+    "family_top1": null,
+    "backoff_acc": null,
+    "species_share": null,
+    "coverage": null,
+    "mean_set_size": null,
+    "ci": {}
    }
   ]
  },
+ "extras": {
+  "inat_india": {
+   "n_test_photos": 558,
+   "n_test_observations": 558,
+   "beta": 0.75,
+   "config": "ensemble",
+   "selective": {
+    "threshold": 0.3545,
+    "target": 0.95,
+    "cal_accuracy_answered": 0.9548,
+    "cal_share_answered": 0.9944,
+    "test_accuracy_answered": {
+     "value": 0.964,
+     "ci": [
+      0.9479,
+      0.9785
+     ]
+    },
+    "test_share_answered": {
+     "value": 0.9964,
+     "ci": [
+      0.991,
+      1.0
+     ]
+    }
+   },
+   "open_set": {
+    "held_out_species": 5,
+    "known_species": 47,
+    "seed": 0,
+    "n_test_held_out": 53,
+    "n_test_known": 505,
+    "refit": {
+     "head": "linear (state config, CPU)",
+     "T": 0.5983,
+     "qhat": 0.4218,
+     "thr": 1.4163,
+     "fusion": {
+      "probe": 0.4,
+      "text": 0.6
+     }
+    },
+    "reject_rate_held_out": {
+     "value": 0.2642,
+     "ci": [
+      0.1538,
+      0.4
+     ]
+    },
+    "false_reject_rate_known": {
+     "value": 0.0693,
+     "ci": [
+      0.0475,
+      0.0939
+     ]
+    },
+    "auroc": {
+     "value": 0.8085,
+     "ci": [
+      0.762,
+      0.8579
+     ]
+    },
+    "known_top1_refit": {
+     "value": 0.9683,
+     "ci": [
+      0.9523,
+      0.9824
+     ]
+    }
+   },
+   "few_shot": [
+    {
+     "shots": 1,
+     "species_added": 5,
+     "top1_new": {
+      "value": 0.8113,
+      "ci": [
+       0.6956,
+       0.9112
+      ]
+     },
+     "top1_known_after": {
+      "value": 0.9683,
+      "ci": [
+       0.9523,
+       0.9824
+      ]
+     }
+    },
+    {
+     "shots": 3,
+     "species_added": 5,
+     "top1_new": {
+      "value": 0.9057,
+      "ci": [
+       0.8163,
+       0.9783
+      ]
+     },
+     "top1_known_after": {
+      "value": 0.9604,
+      "ci": [
+       0.9429,
+       0.9767
+      ]
+     }
+    },
+    {
+     "shots": 5,
+     "species_added": 5,
+     "top1_new": {
+      "value": 0.9434,
+      "ci": [
+       0.8679,
+       1.0
+      ]
+     },
+     "top1_known_after": {
+      "value": 0.9604,
+      "ci": [
+       0.9429,
+       0.9767
+      ]
+     }
+    },
+    {
+     "shots": 10,
+     "species_added": 5,
+     "top1_new": {
+      "value": 0.9245,
+      "ci": [
+       0.8409,
+       1.0
+      ]
+     },
+     "top1_known_after": {
+      "value": 0.9604,
+      "ci": [
+       0.9429,
+       0.9767
+      ]
+     }
+    }
+   ],
+   "target": [
+    {
+     "metric": "single-photo top-1",
+     "value": 0.9606,
+     "ci": [
+      0.9444,
+      0.9767
+     ],
+     "reaches_95": true,
+     "ci_low_reaches_95": false
+    },
+    {
+     "metric": "3-photo top-1",
+     "value": 0.9606,
+     "ci": [
+      0.9444,
+      0.9767
+     ],
+     "reaches_95": true,
+     "ci_low_reaches_95": false
+    },
+    {
+     "metric": "single-photo top-5",
+     "value": 0.9946,
+     "ci": [
+      0.9875,
+      1.0
+     ],
+     "reaches_95": true,
+     "ci_low_reaches_95": true
+    },
+    {
+     "metric": "3-photo top-5",
+     "value": 0.9946,
+     "ci": [
+      0.9875,
+      1.0
+     ],
+     "reaches_95": true,
+     "ci_low_reaches_95": true
+    },
+    {
+     "metric": "genus top-1 (1 photo)",
+     "value": 0.9659,
+     "ci": [
+      0.9498,
+      0.9803
+     ],
+     "reaches_95": true,
+     "ci_low_reaches_95": false
+    },
+    {
+     "metric": "family top-1 (1 photo)",
+     "value": 0.9677,
+     "ci": [
+      0.9516,
+      0.9821
+     ],
+     "reaches_95": true,
+     "ci_low_reaches_95": true
+    },
+    {
+     "metric": "backoff accuracy at reported rank (1 photo)",
+     "value": 0.9797,
+     "ci": [
+      0.9671,
+      0.9908
+     ],
+     "reaches_95": true,
+     "ci_low_reaches_95": true
+    },
+    {
+     "metric": "selective accuracy (answered photos)",
+     "value": 0.964,
+     "ci": [
+      0.9479,
+      0.9785
+     ],
+     "reaches_95": true,
+     "ci_low_reaches_95": false,
+     "share_answered": {
+      "value": 0.9964,
+      "ci": [
+       0.991,
+       1.0
+      ]
+     }
+    }
+   ]
+  },
+  "vl600": {
+   "n_test_photos": 12831,
+   "n_test_observations": 9097,
+   "beta": 0.5,
+   "config": "ensemble",
+   "selective": {
+    "threshold": 0.0849,
+    "target": 0.95,
+    "cal_accuracy_answered": 0.9551,
+    "cal_share_answered": 1.0,
+    "test_accuracy_answered": {
+     "value": 0.9387,
+     "ci": [
+      0.9338,
+      0.9435
+     ]
+    },
+    "test_share_answered": {
+     "value": 0.9999,
+     "ci": [
+      0.9998,
+      1.0
+     ]
+    }
+   },
+   "open_set": {
+    "held_out_species": 61,
+    "known_species": 546,
+    "seed": 0,
+    "n_test_held_out": 1328,
+    "n_test_known": 11503,
+    "refit": {
+     "head": "linear (state config, CPU)",
+     "T": 0.5983,
+     "qhat": 0.1658,
+     "thr": 1.4434,
+     "fusion": {
+      "probe": 0.8,
+      "text": 0.2
+     }
+    },
+    "reject_rate_held_out": {
+     "value": 0.5196,
+     "ci": [
+      0.4859,
+      0.5524
+     ]
+    },
+    "false_reject_rate_known": {
+     "value": 0.2415,
+     "ci": [
+      0.2321,
+      0.2498
+     ]
+    },
+    "auroc": {
+     "value": 0.7382,
+     "ci": [
+      0.7246,
+      0.7525
+     ]
+    },
+    "known_top1_refit": {
+     "value": 0.9348,
+     "ci": [
+      0.9291,
+      0.9397
+     ]
+    }
+   },
+   "few_shot": [
+    {
+     "shots": 1,
+     "species_added": 61,
+     "top1_new": {
+      "value": 0.4563,
+      "ci": [
+       0.4227,
+       0.4882
+      ]
+     },
+     "top1_known_after": {
+      "value": 0.9345,
+      "ci": [
+       0.9287,
+       0.9393
+      ]
+     }
+    },
+    {
+     "shots": 3,
+     "species_added": 61,
+     "top1_new": {
+      "value": 0.6905,
+      "ci": [
+       0.6592,
+       0.7211
+      ]
+     },
+     "top1_known_after": {
+      "value": 0.9336,
+      "ci": [
+       0.9279,
+       0.9384
+      ]
+     }
+    },
+    {
+     "shots": 5,
+     "species_added": 61,
+     "top1_new": {
+      "value": 0.7779,
+      "ci": [
+       0.7511,
+       0.8049
+      ]
+     },
+     "top1_known_after": {
+      "value": 0.9327,
+      "ci": [
+       0.9271,
+       0.9376
+      ]
+     }
+    },
+    {
+     "shots": 10,
+     "species_added": 61,
+     "top1_new": {
+      "value": 0.8449,
+      "ci": [
+       0.8225,
+       0.8674
+      ]
+     },
+     "top1_known_after": {
+      "value": 0.9322,
+      "ci": [
+       0.9267,
+       0.9371
+      ]
+     }
+    }
+   ],
+   "target": [
+    {
+     "metric": "single-photo top-1",
+     "value": 0.9386,
+     "ci": [
+      0.9337,
+      0.9434
+     ],
+     "reaches_95": false,
+     "ci_low_reaches_95": false
+    },
+    {
+     "metric": "3-photo top-1",
+     "value": 0.9577,
+     "ci": [
+      0.9536,
+      0.9617
+     ],
+     "reaches_95": true,
+     "ci_low_reaches_95": true
+    },
+    {
+     "metric": "single-photo top-5",
+     "value": 0.9818,
+     "ci": [
+      0.9791,
+      0.9842
+     ],
+     "reaches_95": true,
+     "ci_low_reaches_95": true
+    },
+    {
+     "metric": "3-photo top-5",
+     "value": 0.9904,
+     "ci": [
+      0.9885,
+      0.9924
+     ],
+     "reaches_95": true,
+     "ci_low_reaches_95": true
+    },
+    {
+     "metric": "genus top-1 (1 photo)",
+     "value": 0.9474,
+     "ci": [
+      0.9428,
+      0.952
+     ],
+     "reaches_95": false,
+     "ci_low_reaches_95": false
+    },
+    {
+     "metric": "family top-1 (1 photo)",
+     "value": 0.956,
+     "ci": [
+      0.9519,
+      0.9603
+     ],
+     "reaches_95": true,
+     "ci_low_reaches_95": true
+    },
+    {
+     "metric": "backoff accuracy at reported rank (1 photo)",
+     "value": 0.9684,
+     "ci": [
+      0.9648,
+      0.9718
+     ],
+     "reaches_95": true,
+     "ci_low_reaches_95": true
+    },
+    {
+     "metric": "selective accuracy (answered photos)",
+     "value": 0.9387,
+     "ci": [
+      0.9338,
+      0.9435
+     ],
+     "reaches_95": false,
+     "ci_low_reaches_95": false,
+     "share_answered": {
+      "value": 0.9999,
+      "ci": [
+       0.9998,
+       1.0
+      ]
+     }
+    }
+   ]
+  }
+ },
  "skipped_datasets": [
-  "dimpsar",
   "campus"
  ]
 }

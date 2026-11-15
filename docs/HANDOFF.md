@@ -125,3 +125,4 @@ Never cut: baseline table, conformal sets, evidence panel, inat_india test split
   deck: frozen encoders presented as a design choice with its benefits (no "no fine-tuning" admission phrasing), lead
   with contributions and head-to-head numbers, limitations kept (required by the brief) but concise, paired with next
   steps, resolved DINO issue moved to methods as a safeguard; no overclaiming, no hidden text, AI-reviewer self-check.
+- 2026-11-16 02:10: L7-f thread failed on provider errors only (Claude 5h limit, Antigravity quota, Antigravity connection loss); switched the same thread back to Claude (capacity restored) and resumed it; WIP in .lanes/L7 preserved.

@@ -111,17 +111,58 @@ def _random_resized_crop_pil(
     return cropped, do_flip
 
 
+_DINOV2_KEY_REMAP = (
+    (".attention.attention.query.", ".attention.q_proj."),
+    (".attention.attention.key.", ".attention.k_proj."),
+    (".attention.attention.value.", ".attention.v_proj."),
+    (".attention.output.dense.", ".attention.o_proj."),
+)
+
+
+def _remap_checkpoint_key(key: str, targets: dict[str, torch.Tensor]) -> str | None:
+    """Resolve a checkpoint tensor key against model targets, applying DINOv2 attention key remaps if needed."""
+    candidates = [key]
+    remapped = key
+    for old, new in _DINOV2_KEY_REMAP:
+        if old in remapped:
+            remapped = remapped.replace(old, new)
+    if remapped != key:
+        candidates.append(remapped)
+
+    for cand in candidates:
+        if cand in targets:
+            return cand
+        if "." in cand:
+            stripped = cand.split(".", 1)[1]
+            if stripped in targets:
+                return stripped
+    return None
+
+
 def _stream_safetensors_into_model(
     model: torch.nn.Module,
     checkpoint_path: str | Path,
     device: str | torch.device,
     fp16: bool,
 ) -> dict:
-    """Stream tensors from a .safetensors file directly into model parameters on device without full-file mmap."""
+    """Stream tensors from a .safetensors file directly into model parameters on device without full-file mmap.
+
+    Raises RuntimeError if any model parameter or persistent buffer is left unloaded.
+    """
     if fp16:
         model.half()
     model.to(device)
-    targets = {**dict(model.named_parameters()), **dict(model.named_buffers())}
+
+    non_persistent: set[str] = set()
+    for mod_name, mod in model.named_modules():
+        for buf_name in getattr(mod, "_non_persistent_buffers_set", ()):
+            non_persistent.add(f"{mod_name}.{buf_name}" if mod_name else buf_name)
+
+    params = dict(model.named_parameters())
+    buffers = {k: v for k, v in model.named_buffers() if k not in non_persistent}
+    targets = {**params, **buffers}
+    loaded_keys: set[str] = set()
+
     with open(checkpoint_path, "rb") as f, torch.no_grad():
         header_len = struct.unpack("<Q", f.read(8))[0]
         header = json.loads(f.read(header_len))
@@ -129,16 +170,23 @@ def _stream_safetensors_into_model(
         for key, info in header.items():
             if key == "__metadata__":
                 continue
-            target = targets.get(key)
-            if target is None and "." in key:
-                target = targets.get(key.split(".", 1)[1])
-            if target is None:
+            target_key = _remap_checkpoint_key(key, targets)
+            if target_key is None:
                 continue
+            target = targets[target_key]
             start, end = info["data_offsets"]
             f.seek(base_offset + start)
             buf = bytearray(f.read(end - start))
             tensor = torch.frombuffer(buf, dtype=_SAFETENSORS_DTYPE_MAP[info["dtype"]]).reshape(info["shape"])
             target.data.copy_(tensor.reshape(target.shape).to(device=target.device, dtype=target.dtype))
+            loaded_keys.add(target_key)
+
+    unloaded = sorted(set(targets) - loaded_keys)
+    if unloaded:
+        raise RuntimeError(
+            f"Checkpoint {checkpoint_path} left {len(unloaded)}/{len(targets)} model tensors unloaded "
+            f"(first 5: {unloaded[:5]})"
+        )
     return {}
 
 
@@ -228,6 +276,8 @@ class Encoder:
 
         self.dino.eval()
         self.dino.requires_grad_(False)
+        dino_short = "dinov3" if "dinov3" in self.dino_model_name.lower() else self.dino_model_name.split("/")[-1]
+        self.encoder_name = f"bioclip2+{dino_short}"
 
         dino_dim = getattr(self.dino.config, "hidden_size", None)
         assert dino_dim == config.DINO_DIM, f"expected DINO_DIM={config.DINO_DIM}, got {dino_dim}"
@@ -268,8 +318,6 @@ class Encoder:
             model = AutoModel.from_config(cfg, dtype=self.dtype)
             _stream_safetensors_into_model(model, ckpt, self.device, self.fp16)
             return model.eval()
-        except Exception:
-            return AutoModel.from_pretrained(model_name, dtype=self.dtype).to(self.device).eval()
         finally:
             torch.set_default_dtype(prev_dtype)
 
@@ -633,7 +681,7 @@ def main(argv: list[str] | None = None) -> None:
             "ids": np.array(ids_shard),
             "X": X_shard.astype(np.float32),
             "y": y_shard,
-            "encoder": "bioclip2+dinov3",
+            "encoder": getattr(enc, "encoder_name", "bioclip2+dinov2-large"),
             "X_plain": X_plain_shard.astype(np.float32),
             "failed_count": np.array([failed_shard], dtype=np.int64),
         }
@@ -662,9 +710,12 @@ def main(argv: list[str] | None = None) -> None:
     all_y_aug: list[np.ndarray] = []
     any_y = False
     has_all_plain = True
+    resolved_encoder_name = getattr(enc, "encoder_name", None)
 
     for shard_path in shard_paths:
         s_set = contracts.EmbeddingSet.load(shard_path)
+        if resolved_encoder_name is None and s_set.encoder:
+            resolved_encoder_name = s_set.encoder
         all_ids.extend(s_set.ids)
         if s_set.X.size > 0:
             all_X.append(s_set.X)
@@ -691,7 +742,7 @@ def main(argv: list[str] | None = None) -> None:
         "ids": np.array(all_ids),
         "X": X_final,
         "y": y_final,
-        "encoder": "bioclip2+dinov3",
+        "encoder": resolved_encoder_name or "bioclip2+dinov2-large",
     }
     if has_all_plain and all_X_plain:
         X_plain_final = np.vstack(all_X_plain).astype(np.float32)

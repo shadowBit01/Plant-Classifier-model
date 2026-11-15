@@ -323,31 +323,51 @@ def _lookup_gbif_taxa_info(
 
     updated = False
     out: dict[str, tuple[str, int | None]] = {}
+    missing: list[str] = []
     for sp in species_names:
         if sp in cache:
             entry = cache[sp]
             fam = str(entry.get("family") or "")
             key = entry.get("gbif_key")
             out[sp] = (fam, int(key) if key is not None else None)
-            continue
+        else:
+            missing.append(sp)
 
-        fam = ""
-        gbif_key: int | None = None
-        params = urllib.parse.urlencode({"name": sp, "kingdom": "Plantae"})
-        url = f"https://api.gbif.org/v1/species/match?{params}"
-        try:
-            req = urllib.request.Request(url, headers={"Accept": "application/json"})
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-            if data.get("matchType", "NONE") != "NONE":
-                fam = str(data.get("family") or "")
-                raw_key = data.get("speciesKey") or data.get("usageKey")
-                gbif_key = int(raw_key) if raw_key is not None else None
-        except Exception:
-            pass
-        cache[sp] = {"family": fam, "gbif_key": gbif_key}
-        out[sp] = (fam, gbif_key)
-        updated = True
+    if missing:
+        import os
+
+        offline = os.environ.get("VANALENS_OFFLINE", "0") == "1"
+
+        def _fetch_one(sp: str) -> tuple[str, str, int | None]:
+            if offline:
+                return sp, "", None
+            fam = ""
+            gbif_key: int | None = None
+            params = urllib.parse.urlencode({"name": sp, "kingdom": "Plantae"})
+            url = f"https://api.gbif.org/v1/species/match?{params}"
+            try:
+                req = urllib.request.Request(url, headers={"Accept": "application/json"})
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                if data.get("matchType", "NONE") != "NONE":
+                    fam = str(data.get("family") or "")
+                    raw_key = data.get("speciesKey") or data.get("usageKey")
+                    gbif_key = int(raw_key) if raw_key is not None else None
+            except Exception:
+                pass
+            return sp, fam, gbif_key
+
+        if len(missing) > 4 and not offline:
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                fetched = list(pool.map(_fetch_one, missing))
+        else:
+            fetched = [_fetch_one(sp) for sp in missing]
+
+        for sp, fam, gbif_key in fetched:
+            cache[sp] = {"family": fam, "gbif_key": gbif_key}
+            out[sp] = (fam, gbif_key)
+        if not offline:
+            updated = True
 
     if updated:
         try:
@@ -437,6 +457,93 @@ def load_inat_india(root: Path = DATA_DIR / "inat_india") -> tuple[list[Sample],
     return samples, taxa
 
 
+def load_vl600(root: Path = DATA_DIR / "vl600") -> tuple[list[Sample], list[Taxon]]:
+    """Load vl600 dataset from `root` (source="inat", group=obs_id, lat/lon filled).
+    Never drops a species from species.csv even if it has few or no photos/test observations."""
+    root = Path(root)
+    species_set: set[str] = set()
+    species_csv = root / "species.csv"
+    if species_csv.exists():
+        with species_csv.open("r", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                sp = str(row.get("name") or row.get("species") or "").strip()
+                if sp:
+                    species_set.add(sp)
+
+    meta_by_img: dict[str, dict[str, str]] = {}
+    meta_path = root / "meta.csv"
+    if meta_path.exists():
+        with meta_path.open("r", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                img_rel = str(row.get("image") or "").replace("\\", "/").strip()
+                if img_rel:
+                    meta_by_img[img_rel] = row
+                    if "/" in img_rel:
+                        species_set.add(img_rel.split("/", 1)[0])
+
+    if not species_set:
+        species_set = {
+            p.parent.name for p in root.glob("*/*.jpg") if p.parent != root
+        }
+
+    species_names = sorted(species_set)
+    gbif_info = _lookup_gbif_taxa_info(species_names, existing_labels=root / "labels.json")
+    taxa = [
+        Taxon(
+            idx=i,
+            species=sp,
+            genus=sp.split()[0],
+            family=gbif_info[sp][0],
+            gbif_key=gbif_info[sp][1],
+        )
+        for i, sp in enumerate(species_names)
+    ]
+    root.mkdir(parents=True, exist_ok=True)
+    save_taxa(taxa, root / "labels.json")
+
+    sp_to_idx = {t.species: t.idx for t in taxa}
+    samples: list[Sample] = []
+    for sp in species_names:
+        sp_dir = root / sp
+        if not sp_dir.is_dir():
+            continue
+        for img_path in sorted(sp_dir.glob("*.jpg"), key=lambda p: p.stem):
+            rel_img = f"{sp}/{img_path.name}"
+            if meta_by_img and rel_img not in meta_by_img:
+                continue
+            row = meta_by_img.get(rel_img) or {}
+            stem = img_path.stem
+            default_obs = stem.split("_", 1)[0] if "_" in stem else stem
+            group = str(row.get("obs_id") or default_obs).strip()
+            lat: float | None = None
+            lon: float | None = None
+            try:
+                if row.get("lat") not in (None, ""):
+                    lat_v = float(row["lat"])
+                    if np.isfinite(lat_v):
+                        lat = lat_v
+                if row.get("lon") not in (None, ""):
+                    lon_v = float(row["lon"])
+                    if np.isfinite(lon_v):
+                        lon = lon_v
+            except Exception:
+                lat, lon = None, None
+            samples.append(
+                Sample(
+                    image_id=f"vl600/{sp}/{stem}",
+                    path=str(img_path.resolve()),
+                    label=sp_to_idx[sp],
+                    source="inat",
+                    group=group,
+                    organ=None,
+                    lat=lat,
+                    lon=lon,
+                )
+            )
+
+    return samples, taxa
+
+
 def load_dimpsar(root: Path, part: str = "leaf") -> tuple[list[Sample], list[Taxon]]:
     """part: "leaf" (80 species single leaves) or "plant" (40 species). group = image stem
     unless the dataset exposes plant/session ids."""
@@ -451,7 +558,86 @@ def load_plantnet300k(root: Path, split: str) -> tuple[list[Sample], list[Taxon]
 def load_campus(root: Path, taxa: list[Taxon] | None = None) -> tuple[list[Sample], list[Taxon]]:
     """If `taxa` is given, map folder names onto it (unknown species -> label None). group = plant_id or folder.
     Fill lat/lon from meta.csv, else from EXIF (read_exif_gps)."""
-    raise NotImplementedError
+    root = Path(root)
+    meta_by_img: dict[str, dict[str, str]] = {}
+    meta_path = root / "meta.csv"
+    if meta_path.exists():
+        with meta_path.open("r", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                img_rel = str(row.get("image") or "").replace("\\", "/").strip()
+                if img_rel:
+                    meta_by_img[img_rel] = row
+
+    folder_names = sorted(
+        p.name for p in root.iterdir() if p.is_dir() and not p.name.startswith(".")
+    ) if root.exists() else []
+
+    if taxa is None:
+        gbif_info = _lookup_gbif_taxa_info(folder_names, existing_labels=root / "labels.json")
+        out_taxa = [
+            Taxon(
+                idx=i,
+                species=sp,
+                genus=sp.split()[0],
+                family=gbif_info[sp][0],
+                gbif_key=gbif_info[sp][1],
+            )
+            for i, sp in enumerate(folder_names)
+        ]
+        if root.exists():
+            save_taxa(out_taxa, root / "labels.json")
+    else:
+        out_taxa = list(taxa)
+
+    sp_to_idx = {t.species: t.idx for t in out_taxa}
+    samples: list[Sample] = []
+    for sp in folder_names:
+        sp_dir = root / sp
+        img_files = sorted(
+            [
+                p
+                for p in sp_dir.iterdir()
+                if p.is_file() and p.suffix.lower() in {".jpg", ".jpeg", ".png"}
+            ],
+            key=lambda p: p.name,
+        )
+        for img_path in img_files:
+            rel_img = f"{sp}/{img_path.name}"
+            row = meta_by_img.get(rel_img) or meta_by_img.get(img_path.name) or {}
+            plant_id = str(row.get("plant_id") or "").strip()
+            group = plant_id if plant_id else sp
+            organ_raw = str(row.get("organ") or "").strip()
+            organ = organ_raw if organ_raw else None
+
+            lat: float | None = None
+            lon: float | None = None
+            try:
+                if row.get("lat") not in (None, "") and row.get("lon") not in (None, ""):
+                    lat_v = float(row["lat"])
+                    lon_v = float(row["lon"])
+                    if np.isfinite(lat_v) and np.isfinite(lon_v):
+                        lat, lon = lat_v, lon_v
+            except Exception:
+                lat, lon = None, None
+            if lat is None or lon is None:
+                gps = read_exif_gps(str(img_path))
+                if gps is not None:
+                    lat, lon = gps
+
+            samples.append(
+                Sample(
+                    image_id=f"campus/{sp}/{img_path.stem}",
+                    path=str(img_path.resolve()),
+                    label=sp_to_idx.get(sp, None),
+                    source="campus",
+                    group=group,
+                    organ=organ,
+                    lat=lat,
+                    lon=lon,
+                )
+            )
+
+    return samples, out_taxa
 
 
 def grouped_split(samples: list[Sample], fractions: tuple[float, float, float] = (0.6, 0.2, 0.2),

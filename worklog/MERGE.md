@@ -61,3 +61,9 @@ Append-only. Written only by the L6-m merge card in the main checkout. Format: A
 - Needs: none
 - Key: 
 - Next: dispatcher routes failures to their lanes
+
+## 2026-11-15 16:40 | L6-m | DONE
+- Did: merged L4; failed none
+- Needs: none
+- Key: 
+- Next: dispatcher routes failures to their lanes

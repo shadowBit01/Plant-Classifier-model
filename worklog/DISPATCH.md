@@ -33,3 +33,11 @@ Append-only. One entry per dispatcher run. Format: AGENTS.md section 6.
 - Results: 2 merged, 2 dispatched, 0 blocked
 - Needs: none
 - Next: L1-c/L2-b push; next run merges them and dispatches what they unblock (L3-b, L5-b).
+
+## 2026-11-15 06:47 | DISPATCH | DONE
+- Did: pulled main (clean); merge_lanes.py merged L1 (L1-c), L2 (L2-b), 0 failed; dispatched L2-c (Antigravity A / gemini-4-argon, Local full-access, Plant-Classifier-model). No blocked items.
+- Files: worklog/DISPATCH.md
+- Tests: lane gate tests run by merge_lanes.py (passed)
+- Results: 2 merged, 1 dispatched, 0 blocked
+- Needs: none
+- Next: L2-c runs embedding extraction (long GPU job); next run merges it and dispatches L3-b/L5-b once their gates open.

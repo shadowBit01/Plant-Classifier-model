@@ -121,3 +121,7 @@ Never cut: baseline table, conformal sets, evidence panel, inat_india test split
   probes, kNN-only, concat probe, text-only, full 1/3 photos, CIs). L7-d now depends on L7-e + L6-d.
 - 2026-11-16 00:55 lead: L6-d was dispatched (00:39) before the baselines line was added, so moved it to a new card
   L6-e (deps L6-d): "baselines" block in final.json; L7-d now depends on L7-e + L6-e.
+- 2026-11-16 01:30 lead (human request): no fine-tuning wave. Added L7-f (deps L7-d): final framing pass of report +
+  deck: frozen encoders presented as a design choice with its benefits (no "no fine-tuning" admission phrasing), lead
+  with contributions and head-to-head numbers, limitations kept (required by the brief) but concise, paired with next
+  steps, resolved DINO issue moved to methods as a safeguard; no overclaiming, no hidden text, AI-reviewer self-check.

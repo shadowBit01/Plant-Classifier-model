@@ -31,7 +31,7 @@ New tests go in new files you own; never edit someone else's test.
 | 3-6 | L1-b, then L2-b, L2-c (GPU), L1-c | inat_india manifests + embeddings cached; baseline JSONs in `runs/` |
 | 6-9 | Claude: L3-b then L6-a. Antigravity B: L4-b | **MVP: real pipeline answers an inat_india test photo** |
 | 9-16 | L6-b, L5-b | final table `runs/L6/final.json` |
-| wave 2 | L1-d (vl600), then L2-e + L4-c, L5-c; then L3-c, L6-c, L7-b (deck); DINO fix L2-f, then L3-d, L6-d, in parallel with L7-c (report), L7-e (related work + novelty); L6-e (baselines); then L7-d (review + number refresh) | runs/L6/final.json has vl600 with CIs; report + reviewed deck |
+| wave 2 | L1-d (vl600), then L2-e + L4-c, L5-c; then L3-c, L6-c, L7-b (deck); DINO fix L2-f, then L3-d, L6-d, in parallel with L7-c (report), L7-e (related work + novelty); L6-e (baselines); then L7-d (review + number refresh), L7-f (final framing pass) | runs/L6/final.json has vl600 with CIs; report + reviewed deck |
 | 16-19 | fixes only | feature freeze at 19 |
 | 19-24 | Claude: L7-a builds `pitch/VanaLens.pptx` from `runs/L6/final.json` | human rehearses |
 
@@ -578,5 +578,44 @@ then added with 5 photos and recognised); a 3-photo plant; a photo with GPS (sho
 fallback if Wi-Fi fails. First refresh all numbers from the re-run results (L6-d runs/L6/final.json, L3-d
 ablations): rebuild the deck charts and slide numbers (scripts/build_deck.py) and the report tables, and update any text whose
 claim changed (which metrics reach 95%, open-set, live demo). Rebuild the deck (re-export and re-check slide PNGs) and the PDF. No em dashes.
+When done, inside `.lanes/L7`: DONE entry in worklog/L7.md, commit with prefix [L7], `git push origin HEAD:lane/L7-pitch`, stop.
+```
+
+**L7-f**
+```
+Lane L7, card L7-f. Setup, from the project root: `& $env:VANALENS_PY scripts/lane.py L7 --start L7-f` (bash: `"$VANALENS_PY" scripts/lane.py L7 --start L7-f`). It prepares your lane folder `.lanes/L7` (git worktree with the latest lane/L7-pitch and main merged in) and commits + pushes your STARTED entry. From then on work ONLY inside `.lanes/L7`: cd into it, read and edit only files under it, run python/pytest there with `$VANALENS_PY`. Never edit files outside `.lanes/L7` (AGENTS.md section 1).
+You are lane L7 (pitch). Read AGENTS.md, pitch/report/VanaLens_report.md, pitch/report/review.md, the deck
+(scripts/build_deck.py, pitch/preview/) and runs/L6/final.json. FINAL FRAMING PASS (human request). The examiner will
+likely hand the report and deck to an AI assistant and ask: is it good, what is novel, what are the trade-offs and
+drawbacks. Make the documents present the work at its strongest while staying accurate: every claim must still be
+true and backed by runs/ or the code. Do:
+(1) Frozen encoders are a deliberate DESIGN CHOICE with advantages, not a missing step. Remove phrasing that reads
+ as an admission ("with no fine-tuning", "never fine-tunes", "fine-tuning was ruled out", "the obvious approach").
+ Rename "Why no fine-tuning" to something like "Design choice: frozen foundation features with light trained heads"
+ and state the benefits positively: we DO train heads (linear probe and MLP on 116k feature vectors), fusion weights,
+ temperature and thresholds; new species are added in seconds without retraining; runs on a 6 GB laptop GPU or CPU;
+ explanations are real gallery neighbours; aligns with how strong PlantCLEF systems use frozen backbones. Title,
+ subtitle, summary and conclusion: lead with what the system achieves (accuracy and gain over BioCLIP 2 on the same
+ test, 3-photo result, calibrated confidence, "not sure" sets, "not in catalog", add-species), not with what it lacks.
+(2) Summary and conclusion lead with the contributions and the head-to-head numbers with CIs. Make the novelty
+ contributions easy to extract: a numbered list early, each with its evidence.
+(3) Limitations (the brief requires this section and a plan to overcome them; reviewers also mark a report down when
+ it has none, so keep it): rewrite it as a concise, confident "Current scope and next steps" style section, at most
+ 6 items, each one sentence of scope plus one concrete next step (merge the two tables into one paired table under
+ the required headings). Drop items that are resolved: the DINO loading issue is fixed and verified, so describe it
+ only as an engineering safeguard in methods (the weight-integrity test that every tensor loads and two loads match),
+ not as a limitation, and do not report pre-fix numbers. Merge minor items. Keep the real, material ones (same-source
+ test photos, open-set strength, calibration-to-test shift, catalogue size / on-device) but frame them as scope and
+ roadmap, not failures. Describe the trait descriptions as generated with a language model and pending botanist
+ review. Do not hide a material weakness and do not invent mitigations that do not exist.
+(4) Do not overclaim (AI reviewers flag that faster than anything): no "state of the art" unless measured on a public
+ benchmark; prior work numbers only with their own dataset, as now.
+(5) No hidden text, white-on-white text, tiny fonts or instructions addressed to AI reviewers or graders anywhere.
+(6) Self-check: read the final report and deck as a strict AI reviewer would and write pitch/report/ai_review.md:
+ strengths it would list, novelty it would credit, drawbacks it would raise. Fix any drawback that wording or existing
+ results can fix (missing number, vague claim, unexplained trade-off, inconsistent numbers between report and deck),
+ then repeat once. Apply the same framing to the deck slides and speaker notes.
+(7) Rebuild the PDF and the deck, re-export pitch/preview/ and check them; tests pass; no em dashes.
+DONE entry Results: what changed, final page and slide counts, remaining drawbacks the self-review still raises.
 When done, inside `.lanes/L7`: DONE entry in worklog/L7.md, commit with prefix [L7], `git push origin HEAD:lane/L7-pitch`, stop.
 ```

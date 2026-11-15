@@ -105,3 +105,106 @@ def test_load_inat_india(tmp_path):
     assert samples[0].group == "1001"
     assert samples[0].lat == 23.18 and samples[0].lon == 79.99
     assert load_taxa(tmp_path / "labels.json") == taxa
+
+
+def test_baseline_plantnet_api(tmp_path, monkeypatch):
+    from scripts.baseline_plantnet_api import (
+        cache_path_for,
+        plantnet_organ,
+        response_to_proba,
+        run_b0,
+        sample_manifest,
+    )
+
+    taxa = [
+        Taxon(0, "Ficus religiosa", "Ficus", "Moraceae", 5361909),
+        Taxon(1, "Azadirachta indica", "Azadirachta", "Meliaceae", 3190474),
+    ]
+    labels_path = tmp_path / "labels.json"
+    save_taxa(taxa, labels_path)
+
+    # Test organ mapping and probability mapping (matched vs unmatched -> uniform)
+    assert plantnet_organ("flower") == "flower"
+    assert plantnet_organ("whole_plant") == "auto"
+    assert plantnet_organ(None) == "auto"
+
+    p_match = response_to_proba(
+        {
+            "results": [
+                {"score": 0.8, "species": {"scientificNameWithoutAuthor": "Ficus religiosa"}},
+                {"score": 0.2, "species": {"scientificNameWithoutAuthor": "Unknown plant"}},
+            ]
+        },
+        taxa,
+    )
+    assert np.allclose(p_match, [1.0, 0.0])
+
+    p_unmatched = response_to_proba(
+        {"results": [{"score": 0.9, "species": {"scientificNameWithoutAuthor": "Bellis perennis"}}]},
+        taxa,
+    )
+    assert np.allclose(p_unmatched, [0.5, 0.5])
+
+    # Test deterministic 400-image sampling
+    many = [Sample(f"id/{i}", f"/p/{i}.jpg", label=i % 2) for i in range(500)]
+    s400 = sample_manifest(many, max_samples=400, seed=0)
+    assert len(s400) == 400
+    assert [s.image_id for s in s400] == [s.image_id for s in sample_manifest(many, max_samples=400, seed=0)]
+
+    # Test skip when PLANTNET_API_KEY is empty
+    monkeypatch.delenv("PLANTNET_API_KEY", raising=False)
+    assert run_b0("dummy", api_key="") is None
+
+    # Test caching and skipping already cached images
+    img0 = tmp_path / "0.jpg"
+    img1 = tmp_path / "1.jpg"
+    Image.new("RGB", (8, 8)).save(img0)
+    Image.new("RGB", (8, 8)).save(img1)
+    manifest_samples = [
+        Sample("dummy/0", str(img0), label=0, organ="leaf"),
+        Sample("dummy/1", str(img1), label=1, organ=None),
+    ]
+    manifest_path = tmp_path / "dummy_test.jsonl"
+    write_manifest(manifest_samples, manifest_path)
+
+    cache_dir = tmp_path / "cache_plantnet"
+    cache_dir.mkdir()
+    # Pre-cache first sample so only second sample should trigger an HTTP call
+    c0 = cache_path_for(manifest_samples[0], cache_dir)
+    c0.write_text(
+        '{"results": [{"score": 0.9, "species": {"scientificNameWithoutAuthor": "Ficus religiosa"}}]}',
+        encoding="utf-8",
+    )
+
+    calls = []
+
+    class DummyResp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {
+                "results": [
+                    {"score": 0.75, "species": {"scientificNameWithoutAuthor": "Azadirachta indica"}}
+                ]
+            }
+
+    class DummySession:
+        def post(self, url, params=None, files=None, data=None, timeout=None):
+            calls.append((url, params, data))
+            return DummyResp()
+
+    monkeypatch.setattr("eval.harness.RUNS_DIR", tmp_path / "runs")
+    res = run_b0(
+        "dummy",
+        manifest_path=manifest_path,
+        labels_path=labels_path,
+        cache_dir=cache_dir,
+        api_key="test-key",
+        session=DummySession(),
+    )
+    assert res is not None and res["n"] == 2 and res["top1"] == 1.0
+    assert len(calls) == 1
+    assert calls[0][2] == {"organs": ["auto"]}
+    assert (tmp_path / "runs" / "L1" / "b0_dummy.json").exists()
+

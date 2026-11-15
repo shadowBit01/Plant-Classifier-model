@@ -49,3 +49,11 @@ Append-only. One entry per dispatcher run. Format: AGENTS.md section 6.
 - Results: 1 merged, 1 dispatched, 0 blocked
 - Needs: none
 - Next: L3-b fits core state + ablation; next run merges it and dispatches what it unblocks (L5-b, L6).
+
+## 2026-11-15 13:52 | DISPATCH | DONE
+- Did: pulled main (clean); merge_lanes.py merged L3 (L3-b), 0 failed; dispatched L6-a (Claude, Local full-access, Plant-Classifier-model). No blocked items.
+- Files: worklog/DISPATCH.md
+- Tests: lane gate tests run by merge_lanes.py (passed)
+- Results: 1 merged, 1 dispatched, 0 blocked
+- Needs: none
+- Next: L6-a builds the integrated pipeline + e2e runs; next run merges it and dispatches L5-b / L7 as unblocked.

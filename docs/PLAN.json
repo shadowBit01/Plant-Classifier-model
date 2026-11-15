@@ -12,7 +12,7 @@
    ]
   },
   "L2": {
-   "provider": "Claude",
+   "provider": "Antigravity A",
    "branch": "lane/L2-encoders",
    "project": "Plant-Classifier-model",
    "folder": ".lanes/L2",
@@ -21,7 +21,7 @@
    ]
   },
   "L3": {
-   "provider": "Claude",
+   "provider": "Antigravity",
    "branch": "lane/L3-core-ml",
    "project": "Plant-Classifier-model",
    "folder": ".lanes/L3",
@@ -48,7 +48,7 @@
    ]
   },
   "L6": {
-   "provider": "Claude",
+   "provider": "Antigravity",
    "branch": "lane/L6-integration",
    "project": "Plant-Classifier-model",
    "folder": ".lanes/L6",
@@ -57,7 +57,7 @@
    ]
   },
   "L7": {
-   "provider": "Claude",
+   "provider": "Antigravity",
    "branch": "lane/L7-pitch",
    "project": "Plant-Classifier-model",
    "folder": ".lanes/L7",

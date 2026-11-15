@@ -26,14 +26,18 @@ class KNNScorer:
     add EPS to every class, renormalise. Shape (N, n_classes), column j = class idx j.
     neighbors: the top-n gallery image ids per query (evidence shown in the UI).
     add(): append new gallery items (few-shot "add a species") without rebuilding from scratch.
+    dino_weight: block weight w; similarity = cos_bioclip + w * cos_dino (the DINO block of gallery and queries
+    is scaled by sqrt(w) before the inner product). w = 1 is the plain inner product on [bioclip | dino].
     """
 
-    def __init__(self, gallery: EmbeddingSet, n_classes: int, k: int = 10, temperature: float = 0.05):
+    def __init__(self, gallery: EmbeddingSet, n_classes: int, k: int = 10, temperature: float = 0.05,
+                 dino_weight: float = 1.0):
         if gallery.y is None:
             raise ValueError("KNNScorer needs a labelled gallery")
         self.n_classes = n_classes
         self.k = k
         self.temperature = temperature
+        self.dino_weight = float(dino_weight)
         self.index = faiss.IndexFlatIP(gallery.X.shape[1])
         self.ids: list[str] = []
         self.y = np.empty(0, dtype=np.int64)
@@ -42,12 +46,18 @@ class KNNScorer:
     def add(self, items: EmbeddingSet) -> None:
         if items.y is None:
             raise ValueError("added gallery items need labels")
-        self.index.add(np.ascontiguousarray(items.X, dtype=np.float32))
+        self.index.add(self._weigh(items.X))
         self.ids.extend(items.ids)
         self.y = np.concatenate([self.y, np.asarray(items.y, dtype=np.int64)])
 
+    def _weigh(self, X: np.ndarray) -> np.ndarray:
+        X = np.array(np.atleast_2d(X), dtype=np.float32, copy=True)
+        if self.dino_weight != 1.0:
+            X[:, BIOCLIP_DIM:] *= np.float32(np.sqrt(self.dino_weight))
+        return np.ascontiguousarray(X)
+
     def _search(self, X: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray]:
-        Xq = np.ascontiguousarray(np.atleast_2d(X), dtype=np.float32)
+        Xq = self._weigh(X)
         return self.index.search(Xq, min(k, self.index.ntotal))
 
     def max_similarity(self, X: np.ndarray) -> np.ndarray:
@@ -138,13 +148,16 @@ class HeadScorer:
     L2 penalty sum(W**2) on the weight matrices, optimiser Adam. Inference is pure numpy, so a saved head
     (save/load, .npz without pickle) needs no torch. Output columns are class idx 0..n_classes-1; classes with
     no training rows still get a column (EPS floor, renormalised).
+    dino_weight multiplies the DINO block (columns BIOCLIP_DIM:) on top of `scale`; it is stored in the saved `sd`,
+    so a loaded head applies it with no extra argument.
     """
 
     def __init__(self, n_classes: int, hidden: int = 0, dropout: float = 0.0, weight_decay: float = 1e-4,
                  label_smoothing: float = 0.0, balanced: bool = False, lr: float = 1e-3, epochs: int = 60,
                  batch_size: int = 1024, patience: int = 8, device: str | None = None, seed: int = 0,
-                 scale: float = 10.0):
+                 scale: float = 10.0, dino_weight: float = 1.0):
         self.n_classes = n_classes
+        self.dino_weight = float(dino_weight)
         self.scale = scale
         self.hidden = hidden
         self.dropout = dropout
@@ -164,7 +177,7 @@ class HeadScorer:
         return {"hidden": self.hidden, "dropout": self.dropout, "weight_decay": self.weight_decay,
                 "label_smoothing": self.label_smoothing, "balanced": self.balanced, "lr": self.lr,
                 "epochs": self.epochs, "batch_size": self.batch_size, "patience": self.patience, "scale": self.scale,
-                "best_epoch": self.best_epoch}
+                "dino_weight": self.dino_weight, "best_epoch": self.best_epoch}
 
     def fit(self, X: np.ndarray, y: np.ndarray, X_val: np.ndarray | None = None,
             y_val: np.ndarray | None = None) -> "HeadScorer":
@@ -177,6 +190,7 @@ class HeadScorer:
         y = np.asarray(y, dtype=np.int64)
         mu = np.zeros(X.shape[1], dtype=np.float32)
         sd = np.full(X.shape[1], 1.0 / self.scale, dtype=np.float32)
+        sd[BIOCLIP_DIM:] /= np.float32(self.dino_weight)
         Xt = torch.from_numpy((X - mu) / sd).to(dev)
         yt = torch.from_numpy(y).to(dev)
         D, C = X.shape[1], self.n_classes

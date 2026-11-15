@@ -86,9 +86,11 @@ def run_extraction(
     manifests_dir: Path | None = None,
     emb_dir: Path | None = None,
     log_file: Path | None = None,
-    batch_size: int = 32,
+    batch_size: int = 64,
+    shard_size: int = 2000,
     device: str | None = None,
     force: bool = False,
+    datasets: list[str] | None = None,
 ) -> list[Path]:
     """Extract embeddings sequentially for all manifests lacking an up-to-date .npz."""
     m_dir = manifests_dir or (config.CACHE_DIR / "manifests")
@@ -99,6 +101,11 @@ def run_extraction(
     l_file.parent.mkdir(parents=True, exist_ok=True)
 
     manifests = sorted(m_dir.glob("*.jsonl")) if m_dir.exists() else []
+    if datasets:
+        prefixes = tuple(f"{ds}_" for ds in datasets)
+        exact = {f"{ds}.jsonl" for ds in datasets}
+        manifests = [m for m in manifests if m.name in exact or m.name.startswith(prefixes)]
+
     _log(
         f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Found {len(manifests)} manifest(s) in {m_dir}",
         l_file,
@@ -126,6 +133,8 @@ def run_extraction(
             str(out_path),
             "--batch-size",
             str(batch_size),
+            "--shard-size",
+            str(shard_size),
         ]
         if device:
             cmd.extend(["--device", device])
@@ -176,9 +185,11 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--manifests-dir", type=Path, default=None, help="Override manifests directory")
     parser.add_argument("--emb-dir", type=Path, default=None, help="Override output embeddings directory")
     parser.add_argument("--log-file", type=Path, default=None, help="Override log file path")
-    parser.add_argument("--batch-size", type=int, default=32, help="Batch size passed to vanalens.encoders")
+    parser.add_argument("--batch-size", type=int, default=64, help="Batch size passed to vanalens.encoders")
+    parser.add_argument("--shard-size", type=int, default=2000, help="Shard size passed to vanalens.encoders")
     parser.add_argument("--device", type=str, default=None, help="Optional device passed to vanalens.encoders")
     parser.add_argument("--force", action="store_true", help="Re-extract even if .npz is up-to-date")
+    parser.add_argument("--datasets", nargs="*", default=None, help="Optional dataset names to filter (e.g. vl600 campus)")
     args = parser.parse_args(argv)
 
     if args.detach:
@@ -190,10 +201,13 @@ def main(argv: list[str] | None = None) -> None:
         emb_dir=args.emb_dir,
         log_file=args.log_file,
         batch_size=args.batch_size,
+        shard_size=args.shard_size,
         device=args.device,
         force=args.force,
+        datasets=args.datasets,
     )
 
 
 if __name__ == "__main__":
     main()
+

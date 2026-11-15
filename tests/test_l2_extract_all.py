@@ -100,3 +100,70 @@ def test_detach_flags(tmp_path: Path, monkeypatch):
         assert captured["kwargs"]["creationflags"] == expected
     else:
         assert captured["kwargs"]["start_new_session"] is True
+
+
+def test_encoders_cli_tta_and_gallery_aug(tmp_path: Path, monkeypatch):
+    from PIL import Image
+    from vanalens import encoders
+
+    img1 = tmp_path / "img1.png"
+    img2 = tmp_path / "img2.png"
+    bad = tmp_path / "bad.jpg"
+    Image.new("RGB", (64, 48), color=(20, 180, 40)).save(img1)
+    Image.new("RGB", (64, 48), color=(180, 40, 20)).save(img2)
+    bad.write_bytes(b"not a valid image")
+
+    manifest = tmp_path / "toy_gallery.jsonl"
+    manifest.write_text(
+        "\n".join(
+            [
+                f'{{"image_id":"g/1","path":"{img1.as_posix()}","label":0}}',
+                f'{{"image_id":"g/bad","path":"{bad.as_posix()}","label":1}}',
+                f'{{"image_id":"g/2","path":"{img2.as_posix()}","label":2}}',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    class FakeEncoder:
+        def __init__(self, **kwargs):
+            from torchvision import transforms as T
+
+            self.preprocess_val = T.Compose([T.Resize((224, 224)), T.ToTensor()])
+            self.dino_preprocess = T.Compose([T.Resize((224, 224)), T.ToTensor()])
+            self._bio_mean = [0.5, 0.5, 0.5]
+            self._bio_std = [0.5, 0.5, 0.5]
+            self._dino_mean = [0.5, 0.5, 0.5]
+            self._dino_std = [0.5, 0.5, 0.5]
+
+        def _encode_batch_tensors(self, bio_batch, dino_batch):
+            B = bio_batch.shape[0]
+            X = np.zeros((B, config.EMB_DIM), dtype=np.float32)
+            for i in range(B):
+                v1 = float(bio_batch[i, 0, 0, 0].item()) + 1.0
+                v2 = float(bio_batch[i, 1, 0, -1].item()) + 1.0
+                X[i, 0] = v1
+                X[i, 1] = v2
+                X[i, config.BIOCLIP_DIM] = v2
+                X[i, config.BIOCLIP_DIM + 1] = v1
+            return encoders._renorm_blocks(X)
+
+        embed_manifest_shard = encoders.Encoder.embed_manifest_shard
+
+    monkeypatch.setattr(encoders, "Encoder", FakeEncoder)
+    out_npz = tmp_path / "toy_gallery.npz"
+    encoders.main(["--manifest", str(manifest), "--out", str(out_npz), "--shard-size", "2"])
+
+    es = contracts.EmbeddingSet.load(out_npz)
+    assert es.ids == ["g/1", "g/2"]
+    assert es.X.shape == (2, config.EMB_DIM)
+    assert list(es.y) == [0, 2]
+    contracts.check_embeddings(es.X)
+
+    with np.load(out_npz, allow_pickle=False) as d:
+        assert "X_aug" in d and "y_aug" in d
+        assert d["X_aug"].shape == (4, config.EMB_DIM)
+        assert list(d["y_aug"]) == [0, 0, 2, 2]
+        contracts.check_embeddings(d["X_aug"])
+

@@ -31,7 +31,48 @@ from vanalens.encoders import _filter_readable_samples, _read_manifest_samples
 logger = logging.getLogger(__name__)
 
 _MODEL_CACHE: dict[tuple[str, str | None, str], tuple[torch.nn.Module, object]] = {}
+_TOL_TXT_CACHE: dict[tuple[str, str], torch.Tensor] = {}
+_PATH_FEAT_CACHE: dict[str, np.ndarray] = {}
 _ORIG_LOAD_PRETRAINED = bp.BaseClassifier.load_pretrained_model
+
+
+def _prepopulate_path_feat_cache(dataset: str, samples: list[contracts.Sample]) -> None:
+    """If $VANALENS_CACHE/emb/<dataset>_test.npz exists, pre-populate _PATH_FEAT_CACHE from its BioCLIP block."""
+    emb_path = config.CACHE_DIR / "emb" / f"{dataset}_test.npz"
+    if not emb_path.exists():
+        return
+    try:
+        with np.load(emb_path, allow_pickle=False) as d:
+            ids = [str(x) for x in d["ids"]]
+            X_src = d["X_plain"] if "X_plain" in d and d["X_plain"].shape == d["X"].shape else d["X"]
+            bio_block = np.asarray(X_src[:, : config.BIOCLIP_DIM], dtype=np.float32)
+        id_to_path = {s.image_id: s.path for s in samples}
+        for idx, img_id in enumerate(ids):
+            p = id_to_path.get(img_id)
+            if p is not None:
+                _PATH_FEAT_CACHE[p] = bio_block[idx]
+    except Exception as exc:
+        logger.warning("Could not pre-populate BioCLIP feature cache from %s: %s", emb_path, exc)
+
+
+def _get_or_encode_bio_features(clf: bp.BaseClassifier, batch_paths: list[str]) -> torch.Tensor:
+    """Return (B, BIOCLIP_DIM) L2-normalised BioCLIP image features on clf.device, using _PATH_FEAT_CACHE when available."""
+    missing_indices = [i for i, p in enumerate(batch_paths) if p not in _PATH_FEAT_CACHE]
+    if missing_indices:
+        missing_paths = [batch_paths[i] for i in missing_indices]
+        pil_imgs = [clf.ensure_rgb_image(p) for p in missing_paths]
+        use_fp16 = str(clf.device).startswith("cuda")
+        with torch.inference_mode(), torch.amp.autocast(device_type="cuda", dtype=torch.float16, enabled=use_fp16):
+            feats = clf.create_image_features(pil_imgs).float().cpu().numpy()
+        for idx, p in zip(missing_indices, missing_paths):
+            _PATH_FEAT_CACHE[p] = feats[missing_indices.index(idx)] if False else None
+        for feat_row, p in zip(feats, missing_paths):
+            _PATH_FEAT_CACHE[p] = feat_row.astype(np.float32)
+
+    arr = np.stack([_PATH_FEAT_CACHE[p] for p in batch_paths], axis=0)
+    use_fp16 = str(clf.device).startswith("cuda")
+    dtype = torch.float16 if use_fp16 else torch.float32
+    return torch.from_numpy(arr).to(device=clf.device, dtype=dtype)
 
 
 def _install_bioclip_memory_patches() -> None:
@@ -56,6 +97,9 @@ def _install_bioclip_memory_patches() -> None:
 
     def _streamed_get_txt_emb(self: TreeOfLifeClassifier) -> torch.Tensor:
         txt_emb_npy = self.get_cached_datafile("embeddings/txt_emb_species.npy")
+        cache_key = (str(txt_emb_npy), str(self.device))
+        if cache_key in _TOL_TXT_CACHE:
+            return _TOL_TXT_CACHE[cache_key]
         use_fp16 = str(self.device).startswith("cuda")
         dtype = torch.float16 if use_fp16 else torch.float32
         with open(txt_emb_npy, "rb") as f:
@@ -66,14 +110,17 @@ def _install_bioclip_memory_patches() -> None:
                 shape, fortran_order, _ = np.lib.format.read_array_header_2_0(f)
             if fortran_order:
                 arr = np.load(txt_emb_npy)
-                return torch.from_numpy(arr).to(device=self.device, dtype=dtype)
+                out = torch.from_numpy(arr).to(device=self.device, dtype=dtype)
+                _TOL_TXT_CACHE[cache_key] = out
+                return out
             out = torch.empty(shape, dtype=dtype, device=self.device)
-            row_chunk = 32
+            row_chunk = 16384
             for start_row in range(0, shape[0], row_chunk):
                 n_rows = min(row_chunk, shape[0] - start_row)
                 raw = bytearray(f.read(n_rows * shape[1] * 4))
                 chunk_tensor = torch.frombuffer(raw, dtype=torch.float32).reshape(n_rows, shape[1])
                 out[start_row : start_row + n_rows].copy_(chunk_tensor.to(device=self.device, dtype=dtype))
+        _TOL_TXT_CACHE[cache_key] = out
         return out
 
     def _mixed_dtype_create_probabilities(
@@ -87,16 +134,25 @@ def _install_bioclip_memory_patches() -> None:
         logits = (scale * (img_features @ txt_features)).float()
         return torch.nn.functional.softmax(logits, dim=1)
 
+    orig_get_txt_embeddings = bp.CustomLabelsClassifier._get_txt_embeddings
+
+    @torch.no_grad()
+    def _fast_get_txt_embeddings(self: bp.CustomLabelsClassifier, classnames: list[str]) -> torch.Tensor:
+        use_fp16 = str(self.device).startswith("cuda")
+        with torch.inference_mode(), torch.amp.autocast(device_type="cuda", dtype=torch.float16, enabled=use_fp16):
+            return orig_get_txt_embeddings(self, classnames)
+
     bp.BaseClassifier.load_pretrained_model = _cached_load_pretrained_model
     bp.TreeOfLifeClassifier.get_txt_emb = _streamed_get_txt_emb
     bp.BaseClassifier.create_probabilities = _mixed_dtype_create_probabilities
+    bp.CustomLabelsClassifier._get_txt_embeddings = _fast_get_txt_embeddings
 
 
 def predict_custom_labels_proba(
     paths: list[str],
     taxa: list[contracts.Taxon],
     device: str = "cuda",
-    batch_size: int = 32,
+    batch_size: int = 64,
 ) -> np.ndarray:
     """Run pybioclip CustomLabelsClassifier over species names and return (N, C) probabilities in taxa order."""
     n_classes = len(taxa)
@@ -109,15 +165,25 @@ def predict_custom_labels_proba(
     clf = CustomLabelsClassifier(cls_ary=species_names, device=device)
     P = np.zeros((len(paths), n_classes), dtype=np.float64)
 
-    for start in range(0, len(paths), batch_size):
-        batch_paths = paths[start : start + batch_size]
-        preds = clf.predict(batch_paths, k=n_classes, batch_size=len(batch_paths))
-        for i in range(len(batch_paths)):
-            row_preds = preds[i * n_classes : (i + 1) * n_classes]
-            for item in row_preds:
-                cls_name = item["classification"].strip()
-                cls_idx = species_to_idx[cls_name]
-                P[start + i, cls_idx] = float(item["score"])
+    if isinstance(clf, bp.CustomLabelsClassifier):
+        col_order = [species_to_idx[c.strip()] for c in clf.classes]
+        with torch.inference_mode():
+            txt_features = clf.txt_embeddings
+            for start in range(0, len(paths), batch_size):
+                batch_paths = paths[start : start + batch_size]
+                img_features = _get_or_encode_bio_features(clf, batch_paths)
+                probs = clf.create_probabilities(img_features, txt_features).detach().cpu().numpy()
+                P[start : start + len(batch_paths), col_order] = probs
+    else:
+        for start in range(0, len(paths), batch_size):
+            batch_paths = paths[start : start + batch_size]
+            preds = clf.predict(batch_paths, k=n_classes, batch_size=len(batch_paths))
+            for i in range(len(batch_paths)):
+                row_preds = preds[i * n_classes : (i + 1) * n_classes]
+                for item in row_preds:
+                    cls_name = item["classification"].strip()
+                    cls_idx = species_to_idx[cls_name]
+                    P[start + i, cls_idx] = float(item["score"])
 
     row_sums = P.sum(axis=1, keepdims=True)
     nonzero = row_sums.squeeze(-1) > 0
@@ -135,29 +201,52 @@ def evaluate_tree_of_life_open_ended(
     y: np.ndarray,
     taxa: list[contracts.Taxon],
     device: str = "cuda",
-    batch_size: int = 32,
+    batch_size: int = 64,
 ) -> dict[str, float]:
     """Run pybioclip TreeOfLifeClassifier at Rank.SPECIES and return top-1 and top-5 species-name match rates."""
     if not paths:
-        return {"tol_top1": 0.0, "tol_top5": 0.0}
+        return {"tol_top1": 0.0, "tol_top5": 0}
 
     tol = TreeOfLifeClassifier(device=device)
     k = 5
     top1_hits = 0
     top5_hits = 0
 
-    for start in range(0, len(paths), batch_size):
-        batch_paths = paths[start : start + batch_size]
-        batch_y = y[start : start + batch_size]
-        preds = tol.predict(batch_paths, rank=Rank.SPECIES, k=k, batch_size=len(batch_paths))
-        for i, true_idx in enumerate(batch_y):
-            target_species = taxa[int(true_idx)].species.strip().lower()
-            row_preds = preds[i * k : (i + 1) * k]
-            pred_species = [str(item.get("species", "")).strip().lower() for item in row_preds]
-            if pred_species and pred_species[0] == target_species:
-                top1_hits += 1
-            if target_species in pred_species[:5]:
-                top5_hits += 1
+    if isinstance(tol, bp.TreeOfLifeClassifier):
+        with torch.inference_mode():
+            txt_features = tol.get_txt_embeddings()
+            k_eff = min(k, txt_features.shape[1])
+            for start in range(0, len(paths), batch_size):
+                batch_paths = paths[start : start + batch_size]
+                batch_y = y[start : start + batch_size]
+                img_features = _get_or_encode_bio_features(tol, batch_paths)
+                if img_features.dtype != txt_features.dtype:
+                    img_features = img_features.to(dtype=txt_features.dtype)
+                scores = img_features @ txt_features
+                topk_indices = scores.topk(k_eff, dim=1).indices.cpu().tolist()
+                for row_indices, true_idx in zip(topk_indices, batch_y):
+                    target_species = taxa[int(true_idx)].species.strip().lower()
+                    pred_species = [
+                        str(tol.get_classification_dict(idx, Rank.SPECIES).get("species", "")).strip().lower()
+                        for idx in row_indices
+                    ]
+                    if pred_species and pred_species[0] == target_species:
+                        top1_hits += 1
+                    if target_species in pred_species[:5]:
+                        top5_hits += 1
+    else:
+        for start in range(0, len(paths), batch_size):
+            batch_paths = paths[start : start + batch_size]
+            batch_y = y[start : start + batch_size]
+            preds = tol.predict(batch_paths, rank=Rank.SPECIES, k=k, batch_size=len(batch_paths))
+            for i, true_idx in enumerate(batch_y):
+                target_species = taxa[int(true_idx)].species.strip().lower()
+                row_preds = preds[i * k : (i + 1) * k]
+                pred_species = [str(item.get("species", "")).strip().lower() for item in row_preds]
+                if pred_species and pred_species[0] == target_species:
+                    top1_hits += 1
+                if target_species in pred_species[:5]:
+                    top5_hits += 1
 
     n = len(paths)
     return {
@@ -171,7 +260,7 @@ def run_dataset(
     manifest_path: Path | None = None,
     labels_path: Path | None = None,
     device: str = "cuda",
-    batch_size: int = 32,
+    batch_size: int = 64,
     run_tol: bool = True,
 ) -> dict:
     """Evaluate B2 (CustomLabelsClassifier + TreeOfLifeClassifier) on a dataset and write runs/L2/b2_<dataset>.json."""
@@ -186,6 +275,7 @@ def run_dataset(
     taxa = contracts.load_taxa(labels)
     raw_samples = _read_manifest_samples(manifest)
     valid_samples = [s for s in _filter_readable_samples(raw_samples) if s.label is not None]
+    _prepopulate_path_feat_cache(dataset, valid_samples)
 
     paths = [s.path for s in valid_samples]
     y = np.array([int(s.label) for s in valid_samples], dtype=np.int64)

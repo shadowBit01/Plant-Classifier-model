@@ -8,10 +8,14 @@ from vanalens.contracts import Prediction, RANKS, Taxon
 from vanalens.pipeline import MockPipeline
 from app.app import (
     MOBILE_CSS,
+    _COMMON_NAMES_CACHE,
     add_species_fn,
     average_log_probabilities,
+    format_species_name,
+    get_common_name,
     is_confident,
     is_open_set_reject,
+    load_common_names,
     predict_fn,
     predict_observation,
     _chips_html,
@@ -337,7 +341,9 @@ def test_dark_mode_contrast_colors():
     )
     html_conf = _result_html(pred_conf, m)
     assert '<div style="border:2px solid #81c784;border-radius:12px;padding:16px;background:#f9fbe7;margin:8px 0;color:#1a1a1a">' in html_conf
-    assert '<span style="font-size:1.3em;font-weight:700;color:#1a1a1a">Ficus religiosa</span>' in html_conf
+    assert "color:#1a1a1a" in html_conf
+    assert "color:#444" in html_conf
+    assert "Ficus religiosa" in html_conf
 
     # 2. _chips_html species chip spans
     taxa_map = {0: "Ficus religiosa", 1: "Ficus benghalensis"}
@@ -379,4 +385,236 @@ def test_dark_mode_contrast_colors():
     # 6. MOBILE_CSS rules
     assert '#result-card > div, #hint-row > div { color: #1a1a1a; }' in MOBILE_CSS
     assert '#result-card li, #result-card strong, #result-card p, #hint-row strong { color: inherit; }' in MOBILE_CSS
+
+
+def test_format_species_name():
+    # Common name exists and differs from species
+    assert format_species_name("Ficus religiosa", "Sacred Fig") == "Sacred Fig (Ficus religiosa)"
+    assert format_species_name("Azadirachta indica", "Neem") == "Neem (Azadirachta indica)"
+
+    # Common name is identical to species (case-insensitive) -> returns species
+    assert format_species_name("Ficus religiosa", "Ficus religiosa") == "Ficus religiosa"
+    assert format_species_name("Ficus religiosa", "ficus religiosa") == "Ficus religiosa"
+
+    # Common name is None or empty string -> returns species
+    assert format_species_name("Ficus religiosa", None) == "Ficus religiosa"
+    assert format_species_name("Ficus religiosa", "") == "Ficus religiosa"
+    assert format_species_name("Ficus religiosa", "   ") == "Ficus religiosa"
+
+    # Empty species returns common_name or empty
+    assert format_species_name("", "Sacred Fig") == "Sacred Fig"
+    assert format_species_name("", "") == ""
+
+
+def test_load_common_names_from_csv_and_json(tmp_path, monkeypatch):
+    import json
+    from vanalens import config as vanalens_config
+
+    data_dir = tmp_path / "data"
+    cache_dir = tmp_path / "cache"
+    (data_dir / "test_ds").mkdir(parents=True)
+    (cache_dir / "test_ds").mkdir(parents=True)
+
+    # 1. DATA_DIR/test_ds/species.csv
+    (data_dir / "test_ds" / "species.csv").write_text(
+        "name,common_name,count\n"
+        "Mangifera indica,Mango,100\n",
+        encoding="utf-8",
+    )
+
+    # 2. CACHE_DIR/test_ds/species.csv
+    (cache_dir / "test_ds" / "species.csv").write_text(
+        "species,preferred_common_name,source\n"
+        "Azadirachta indica,Neem,inat\n",
+        encoding="utf-8",
+    )
+
+    # 3. CACHE_DIR/common_names.json
+    (cache_dir / "common_names.json").write_text(
+        json.dumps({"Ocimum sanctum": "Holy Basil", "Ficus religiosa": "Peepal"}),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(vanalens_config, "DATA_DIR", data_dir)
+    monkeypatch.setattr(vanalens_config, "CACHE_DIR", cache_dir)
+    _COMMON_NAMES_CACHE.clear()
+
+    loaded = load_common_names("test_ds")
+    assert loaded["Mangifera indica"] == "Mango"
+    assert loaded["Azadirachta indica"] == "Neem"
+    assert loaded["Ocimum sanctum"] == "Holy Basil"
+    assert loaded["Ficus religiosa"] == "Peepal"
+
+    # get_common_name retrieves from cache
+    assert get_common_name("Mangifera indica") == "Mango"
+    assert get_common_name("Azadirachta indica") == "Neem"
+    assert get_common_name("Ocimum sanctum") == "Holy Basil"
+
+
+def test_get_common_name_inat_api_mock(tmp_path, monkeypatch):
+    import json
+    from vanalens import config as vanalens_config
+
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir(parents=True)
+    monkeypatch.setattr(vanalens_config, "CACHE_DIR", cache_dir)
+    monkeypatch.setattr(vanalens_config, "DATA_DIR", tmp_path / "data")
+    _COMMON_NAMES_CACHE.clear()
+
+    calls = []
+
+    class MockResponse:
+        status_code = 200
+
+        def json(self):
+            return {
+                "total_results": 1,
+                "results": [
+                    {
+                        "id": 48226,
+                        "name": "Delonix regia",
+                        "preferred_common_name": "Royal Poinciana",
+                        "english_common_name": "Flame Tree",
+                    }
+                ],
+            }
+
+    def mock_get(url, params=None, timeout=None, headers=None):
+        calls.append((url, params, timeout))
+        return MockResponse()
+
+    monkeypatch.setattr("requests.get", mock_get)
+
+    cname = get_common_name("Delonix regia", fetch_api=True)
+    assert cname == "Royal Poinciana"
+    assert len(calls) == 1
+    assert "api.inaturalist.org" in calls[0][0]
+    assert calls[0][1]["q"] == "Delonix regia"
+    assert calls[0][1]["preferred_place_id"] == 6681
+    assert calls[0][2] == 3.0
+
+    # Cached in memory
+    assert _COMMON_NAMES_CACHE.get("Delonix regia") == "Royal Poinciana"
+
+    # Cached in CACHE_DIR/common_names.json
+    cache_file = cache_dir / "common_names.json"
+    assert cache_file.is_file()
+    cached_json = json.loads(cache_file.read_text(encoding="utf-8"))
+    assert cached_json.get("Delonix regia") == "Royal Poinciana"
+
+
+def test_get_common_name_gbif_fallback_mock(tmp_path, monkeypatch):
+    from vanalens import config as vanalens_config
+
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir(parents=True)
+    monkeypatch.setattr(vanalens_config, "CACHE_DIR", cache_dir)
+    monkeypatch.setattr(vanalens_config, "DATA_DIR", tmp_path / "data")
+    _COMMON_NAMES_CACHE.clear()
+
+    calls = []
+
+    def mock_get(url, params=None, timeout=None, headers=None):
+        calls.append((url, params))
+
+        class MockResp:
+            status_code = 200
+
+            def __init__(self, data):
+                self._data = data
+
+            def json(self):
+                return self._data
+
+        if "api.inaturalist.org" in url:
+            # iNat has no results
+            return MockResp({"total_results": 0, "results": []})
+        elif "species/match" in url:
+            # GBIF match resolves usageKey
+            return MockResp({"usageKey": 5352251, "speciesKey": 5352251})
+        elif "vernacularNames" in url:
+            # GBIF vernacular names, preferring 'eng'
+            return MockResp(
+                {
+                    "results": [
+                        {"vernacularName": "Gulmohar", "language": "hin"},
+                        {"vernacularName": "Flamboyant", "language": "eng"},
+                        {"vernacularName": "Peacock Flower", "language": "eng"},
+                    ]
+                }
+            )
+        return MockResp({})
+
+    monkeypatch.setattr("requests.get", mock_get)
+
+    # 1. With gbif_key provided
+    cname1 = get_common_name("Delonix regia", gbif_key=5352251, fetch_api=True)
+    assert cname1 == "Flamboyant"
+
+    # 2. With gbif_key=None -> resolves usageKey via /v1/species/match
+    _COMMON_NAMES_CACHE.clear()
+    (cache_dir / "common_names.json").unlink(missing_ok=True)
+    cname2 = get_common_name("Delonix regia", gbif_key=None, fetch_api=True)
+    assert cname2 == "Flamboyant"
+    assert any("species/match" in c[0] for c in calls)
+
+
+def test_get_common_name_offline_graceful(tmp_path, monkeypatch):
+    import requests
+    from vanalens import config as vanalens_config
+
+    monkeypatch.setattr(vanalens_config, "CACHE_DIR", tmp_path / "cache")
+    monkeypatch.setattr(vanalens_config, "DATA_DIR", tmp_path / "data")
+    _COMMON_NAMES_CACHE.clear()
+
+    def mock_get(url, params=None, timeout=None, headers=None):
+        raise requests.exceptions.ConnectTimeout("Connection timed out")
+
+    monkeypatch.setattr("requests.get", mock_get)
+
+    # Must fail gracefully offline and return None
+    result = get_common_name("Uncataloged species", fetch_api=True)
+    assert result is None
+
+
+def test_result_html_case3_and_case4_with_common_names(monkeypatch):
+    m = MockPipeline()
+    _COMMON_NAMES_CACHE.clear()
+    _COMMON_NAMES_CACHE["Ficus religiosa"] = "Sacred Fig"
+    _COMMON_NAMES_CACHE["Ficus benghalensis"] = "Banyan"
+
+    # Case 4: Confident species shows Common Name prominently (#1a1a1a) and Scientific Name alongside (#444)
+    pred_conf = Prediction(
+        probs=np.array([0.90, 0.05, 0.05]),
+        top_k=[(0, 0.90)],
+        pred_set=[0],
+        rank="species",
+        label="Ficus religiosa",
+        confidence=0.90,
+    )
+    html_conf = _result_html(pred_conf, m)
+    assert '<span style="font-size:1.3em;font-weight:700;color:#1a1a1a">Sacred Fig</span>' in html_conf
+    assert '<span style="font-size:1.0em;font-style:italic;color:#444">(Ficus religiosa)</span>' in html_conf
+    assert "Sacred Fig (Ficus religiosa)" in html_conf
+    assert "Ficus religiosa" in html_conf
+
+    # Case 3: Not confident shows both common and scientific names in Not sure:, list, and chips
+    pred_not_conf = Prediction(
+        probs=np.array([0.48, 0.42, 0.10]),
+        top_k=[(0, 0.48), (1, 0.42)],
+        pred_set=[0, 1],
+        rank="genus",
+        label="Ficus",
+        confidence=0.90,
+    )
+    html_not_conf = _result_html(pred_not_conf, m)
+    assert "Not sure: Sacred Fig (Ficus religiosa), Banyan (Ficus benghalensis)" in html_not_conf
+    assert "<li><strong>Sacred Fig (Ficus religiosa)</strong>: 48.0%</li>" in html_not_conf
+    assert "<li><strong>Banyan (Ficus benghalensis)</strong>: 42.0%</li>" in html_not_conf
+    assert "Sacred Fig (Ficus religiosa) (48.0%)" in html_not_conf
+    assert "Banyan (Ficus benghalensis) (42.0%)" in html_not_conf
+    # Scientific names still present in the HTML
+    assert "Ficus religiosa" in html_not_conf
+    assert "Ficus benghalensis" in html_not_conf
+
 

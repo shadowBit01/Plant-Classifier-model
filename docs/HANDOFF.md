@@ -93,3 +93,7 @@ Never cut: baseline table, conformal sets, evidence panel, inat_india test split
   L7-b, L7-c. L7-a deps -> L6-c (already DONE, so L7-b also depends on L6-c and rebuilds the deck). L3-c also
   waits for L4-c so fusion includes text. L3-c may use the GPU (L2 has no GPU work after L2-e). Report lives in
   pitch/report/ (owned by L7) instead of report/, which has no owner.
+- 2026-11-15 14:45 Human: disk is not a constraint (L1-d cap lifted, stop only under 10 GB free); campus
+  likely not coming, vl600 is the main dataset; accuracy target 95%+. Added honest accuracy levers: L2-e flip TTA
+  + 2 augmented gallery views (X_aug/y_aug, extra npz keys), L3-c aug training, label smoothing, ensemble,
+  all chosen on cal; L6-c reports which metrics reach 95%. No species dropped, no tuning on test.

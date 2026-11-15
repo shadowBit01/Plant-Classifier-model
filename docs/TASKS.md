@@ -116,8 +116,8 @@ vanalens/data.py, manifests via scripts/make_manifests.py.
    (image,obs_id,photo_id,lat,lon,observed_on,license,url,quality_grade,in_india).
    Resumable (skip existing files, checkpoint API progress); run in the background with output to
    runs/logs/build_vl600.log and read only its last 30 lines. Before downloading, write the planned photo count and
-   expected GB (about 80 KB per medium photo) to the log; if it exceeds 15 GB or would leave under 20 GB free,
-   write BLOCKED with the numbers and stop.
+   expected GB (about 80 KB per medium photo) to the log. Disk space is not a constraint (human decision); stop as
+   BLOCKED only if the disk would drop under 10 GB free.
 3. Splits: group = obs_id so an observation's photos stay together and never cross splits; test by the date rule;
    cal = 20% of pre-cutoff observations by group; cap gallery with cap_per_class. Species with few or no test
    observations stay in (never drop); report how many have fewer than 5.
@@ -181,7 +181,12 @@ Lane L2, card L2-e. Setup, from the project root: `& $env:VANALENS_PY scripts/la
 You are lane L2 (encoders, the only GPU lane). Read AGENTS.md. Embed vl600 (gallery, cal, test) and campus_test if
 that manifest exists with scripts/extract_all.py, in the background with output to runs/logs/extract_vl600.log
 (resume-safe; read only the last 30 lines). Make only the changes extract_all.py needs for ~60k images (sharding,
-batch size that fits 6 GB, skip and log unreadable images). Then run the B2 BioCLIP 2 zero-shot baseline on the vl600
+batch size that fits 6 GB, skip and log unreadable images). Accuracy target is 95%+ (human), so also do test-time
+augmentation: for every image store the mean of the embeddings of the original and its horizontal flip (each block
+re-normalised) as X, and for the gallery split also save 2 extra augmented views per image (random resized crop
+0.6-1.0 + flip, seed 0) as X_aug/y_aug in the same npz for probe training. Compute and record in the DONE entry the
+probe top-1 on cal with and without TTA (quick sklearn check) so L3 knows it helps; if TTA hurts, keep plain X.
+Then run the B2 BioCLIP 2 zero-shot baseline on the vl600
 test split (scripts/baseline_bioclip.py) -> runs/L2/b2_vl600.json. Keep inat_india caches untouched.
 Lane tests must pass. DONE entry Results: shapes per split, images/s, failed images, B2 top-1/top-5.
 When done, inside `.lanes/L2`: DONE entry in worklog/L2.md, commit with prefix [L2], `git push origin HEAD:lane/L2-encoders`, stop.
@@ -222,6 +227,11 @@ and open-set threshold are all fit on cal only. Ablation runs/L3/ablation_vl600.
 fused+T, fused+T+sets and mlp (one hidden layer of 1024, dropout, early stopping on cal), each with top-1, top-5,
 macro top-1, NLL, ECE, coverage, mean set size. Keep the linear probe as the default unless the MLP beats it on cal by
 more than 1 point top-1; record the choice in $VANALENS_CACHE/state/vl600.json.
+Accuracy target is 95%+ top-1 (human). Push it honestly, choosing everything on cal only and never dropping species:
+train the probe/MLP on gallery X plus X_aug if present; tune weight decay, label smoothing (0, 0.1) and class-balanced
+weights; try an ensemble (probe + MLP + kNN + text, weights fit on cal) and keep it if it wins on cal; add rows
+"ensemble" and "mlp" to the ablation. Report test top-1, top-5, genus and family top-1. If 95% single-photo top-1 is
+not reached, say so plainly with the number; do not tune on test.
 Add synthetic CPU tests in tests/test_l3_vl600.py; tests/test_core.py stays green.
 When done, inside `.lanes/L3`: DONE entry in worklog/L3.md, commit with prefix [L3], `git push origin HEAD:lane/L3-core-ml`, stop.
 ```
@@ -364,6 +374,8 @@ embeddings).
    runs/ as in L6-b (B2 vl600 from runs/L2/b2_vl600.json); ablation rows from runs/L3/ablation_vl600.json.
    Missing results become rows marked "not run".
 4. End to end on 20 vl600 test observations -> runs/L6/e2e_vl600.json.
+5. Accuracy target 95%+ (human). Report clearly which numbers reach it: single-photo top-1, 3-photo top-1, top-5,
+   genus/family top-1 (backoff), and selective accuracy with its answered share. Never drop species, never tune on test.
 Synthetic tests in tests/test_pipeline.py (no GPU, no network). Print the table as markdown, nothing else.
 When done, inside `.lanes/L6`: DONE entry in worklog/L6.md, commit with prefix [L6], `git push origin HEAD:lane/L6-integration`, stop.
 ```

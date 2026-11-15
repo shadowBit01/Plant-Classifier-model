@@ -68,6 +68,7 @@
   "rowci:vl600:+ geo prior:backoff_acc": "97.1% (95% CI 96.8 to 97.4)",
   "pctci:L6/final.json:extras.vl600.open_set.reject_rate_held_out": "38.0% (95% CI 34.9 to 40.9)",
   "pctci:L6/final.json:extras.vl600.open_set.false_reject_rate_known": "5.9% (95% CI 5.4 to 6.4)",
+  "d:unknown_case": "A live-style check makes the same point. Vanda tessellata, an orchid in inat_india that is not among the 607 vl600 species, was shown to the vl600 model: the gate rejected 0 of its 11 test photos, and 10 were named as a related orchid species with at least 70% confidence. After appending 5 of its photos (no retraining), 11 of the 11 were named correctly. The gate is therefore no guard against close relatives of known species (cached embeddings, `pitch/demo_pick.py`).",
   "fig:fewshot": "Figure 7",
   "pctci:L6/final.json:extras.vl600.few_shot.0.top1_new": "55.4% (95% CI 52.2 to 58.5)",
   "pctci:L6/final.json:extras.vl600.few_shot.2.top1_new": "80.9% (95% CI 78.4 to 83.5)",

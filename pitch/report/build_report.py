@@ -331,6 +331,19 @@ def derived() -> dict[str, str]:
                           f"{pct(e_t)} after), because the fused scores were already well calibrated on this test set")
     e2e = J("L6/e2e_vl600.json") or {}
     d["e2e_ci_vl"] = wilson(e2e.get("top1"), e2e.get("n"))
+    dp = Path(__file__).resolve().parents[1] / "demo_picks.json"     # written by pitch/demo_pick.py (L7-d)
+    u = (json.loads(dp.read_text(encoding="utf-8")) if dp.exists() else {}).get("unknown") or {}
+    if u.get("n_test"):
+        conf_wrong = sum(1 for t in u["test"] if t["before"]["rank"] == "species" and t["before"]["conf"] >= 0.7)
+        d["unknown_case"] = (
+            f"A live-style check makes the same point. {u['species']}, an orchid in inat_india that is not among the "
+            f"607 vl600 species, was shown to the vl600 model: the gate rejected {u['rejected_before']} of its "
+            f"{u['n_test']} test photos, and {conf_wrong} were named as a related orchid species with at least 70% "
+            f"confidence. After appending {u['shots']} of its photos (no retraining), {u['named_after']} of the "
+            f"{u['n_test']} were named correctly. The gate is therefore no guard against close relatives of known "
+            "species (cached embeddings, `pitch/demo_pick.py`).")
+    else:
+        d["unknown_case"] = ""
     rs_path = Path(__file__).with_name("review_stats.json")      # written by review_stats.py (L7-d)
     rs = json.loads(rs_path.read_text(encoding="utf-8")) if rs_path.exists() else {}
     d["india_test_vl"] = NM if rs.get("india_share_test_observations") is None else pct(rs["india_share_test_observations"])

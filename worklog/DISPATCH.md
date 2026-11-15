@@ -339,3 +339,8 @@ Append-only. One entry per dispatcher run. Format: AGENTS.md section 6.
 - Did: run 49: pulled main (clean); nothing to merge or unblock; dispatched L7-c (project report) on Claude, in parallel with L2-f (still in flight).
 - Needs: none
 - Next: merge L2 when L2-f DONE, then dispatch L3-d; merge L7 when L7-c DONE.
+
+## 2026-11-16 00:24 | DISPATCH | DONE
+- Did: run 50: pulled main (clean); merged L2 (L2-f DONE, fixed DINO embeddings) via merge_lanes.py; dispatched L3-d (refit core on new embeddings) on Claude. L7-c still in flight.
+- Needs: none
+- Next: merge L3 when L3-d DONE, then L7-d refreshes numbers; merge L7 when L7-c DONE.

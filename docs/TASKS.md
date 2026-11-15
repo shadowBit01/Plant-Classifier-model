@@ -31,7 +31,7 @@ New tests go in new files you own; never edit someone else's test.
 | 3-6 | L1-b, then L2-b, L2-c (GPU), L1-c | inat_india manifests + embeddings cached; baseline JSONs in `runs/` |
 | 6-9 | Claude: L3-b then L6-a. Antigravity B: L4-b | **MVP: real pipeline answers an inat_india test photo** |
 | 9-16 | L6-b, L5-b | final table `runs/L6/final.json` |
-| wave 2 | L1-d (vl600), then L2-e + L4-c, L5-c; then L3-c, L6-c, L7-b (deck); DINO fix L2-f, then L3-d, L6-d, in parallel with L7-c (report), L7-e (related work + novelty); then L7-d (review + number refresh) | runs/L6/final.json has vl600 with CIs; report + reviewed deck |
+| wave 2 | L1-d (vl600), then L2-e + L4-c, L5-c; then L3-c, L6-c, L7-b (deck); DINO fix L2-f, then L3-d, L6-d, in parallel with L7-c (report), L7-e (related work + novelty); L6-e (baselines); then L7-d (review + number refresh) | runs/L6/final.json has vl600 with CIs; report + reviewed deck |
 | 16-19 | fixes only | feature freeze at 19 |
 | 19-24 | Claude: L7-a builds `pitch/VanaLens.pptx` from `runs/L6/final.json` | human rehearses |
 
@@ -430,11 +430,24 @@ check -> runs/L6/e2e_vl600.json with the same procedure as L6-c (CIs by observat
 accuracy, open-set holdout, few-shot curve, geo prior beta refit on cal). Confirm that the live pipeline now matches the
 cache: e2e top-1 close to the cached test number and the unknown/reject rate on known test photos back to a normal
 level (it was ~95% because of the bug); if live and cache still disagree, find out why and fix it in your files or
-write BLOCKED with the exact cause. Also add a "baselines" block to final.json for vl600 test (same CIs by observation), all trained on gallery,
-tuned on cal only: B2 BioCLIP 2 zero-shot (runs/L2), BioCLIP-only linear probe, DINOv2-only linear probe,
-kNN-only, concatenated-feature probe without fusion, text-prototype-only (zero images), full VanaLens 1 photo
-and 3 photos. These feed the report's head-to-head novelty table (L7-e/L7-d). Lane tests must pass. DONE entry Results: the same metric list as L6-c with
+write BLOCKED with the exact cause. Lane tests must pass. DONE entry Results: the same metric list as L6-c with
 before -> after, and which metrics reach 95%.
+When done, inside `.lanes/L6`: DONE entry in worklog/L6.md, commit with prefix [L6], `git push origin HEAD:lane/L6-integration`, stop.
+```
+
+**L6-e**
+```
+Lane L6, card L6-e. Setup, from the project root: `& $env:VANALENS_PY scripts/lane.py L6 --start L6-e` (bash: `"$VANALENS_PY" scripts/lane.py L6 --start L6-e`). It prepares your lane folder `.lanes/L6` (git worktree with the latest lane/L6-integration and main merged in) and commits + pushes your STARTED entry. From then on work ONLY inside `.lanes/L6`: cd into it, read and edit only files under it, run python/pytest there with `$VANALENS_PY`. Never edit files outside `.lanes/L6` (AGENTS.md section 1).
+You are lane L6 (integration). Read AGENTS.md and the L6-d DONE entry. The report's novelty section needs a fair
+head-to-head on OUR vl600 test split. Add a "baselines" block to runs/L6/final.json (do not change the existing
+numbers), each with top-1, top-5, macro top-1 and 95% CIs by observation, all using the cached fixed embeddings,
+trained on the gallery split (X and X_aug where the main model uses them) and tuned on cal only, never on test:
+B2 BioCLIP 2 zero-shot (from runs/L2/b2_vl600.json, recompute CIs if per-photo predictions are available, else mark
+CI "not available"); BioCLIP-only linear probe; DINOv2-only linear probe; kNN-only (both blocks); concatenated-feature
+probe without fusion; text-prototype-only (zero images per species); full VanaLens 1 photo and 3 photos (copy from
+the main table). Reuse the L3 HeadScorer / scorers code, CPU or GPU is fine (only you run now). Keep it to one script
+(scripts/final_table.py option or a new scripts/baselines_table.py) with a test. Lane tests must pass.
+DONE entry Results: one line per baseline with top-1 [CI].
 When done, inside `.lanes/L6`: DONE entry in worklog/L6.md, commit with prefix [L6], `git push origin HEAD:lane/L6-integration`, stop.
 ```
 
@@ -538,7 +551,7 @@ Do:
  - Every citation must be real: use the links in docs/RESEARCH.md; if you have web access, verify title, authors,
    year and venue; if you cannot verify one, drop it. Never invent a paper, author or number.
 (2) Head-to-head on OUR vl600 test set: build the comparison table from the baselines rows in runs/L6/final.json
-   (L6-d adds them: BioCLIP 2 zero-shot, BioCLIP-only probe, DINOv2-only probe, kNN-only, concat probe, full VanaLens
+   (L6-e adds them: BioCLIP 2 zero-shot, BioCLIP-only probe, DINOv2-only probe, kNN-only, concat probe, full VanaLens
    1 and 3 photos, with 95% CIs). If they are not there yet, wire the table and a bar chart (with CI error bars) through
    build_report.py placeholders from runs/ so L7-d's rebuild fills them; use runs/L2/b2_vl600.json and
    runs/L3/ablation_vl600.json for what already exists. Also compare capabilities none of the baselines have

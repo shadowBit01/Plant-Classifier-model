@@ -119,3 +119,5 @@ Never cut: baseline table, conformal sets, evidence panel, inat_india test split
   numbers kept separate, what we built on vs implemented vs new, verified citations only) + 2-3 deck slides incl. a
   head-to-head chart on our vl600 test. L6-d now also writes a "baselines" block (BioCLIP 2 zero-shot, single-encoder
   probes, kNN-only, concat probe, text-only, full 1/3 photos, CIs). L7-d now depends on L7-e + L6-d.
+- 2026-11-16 00:55 lead: L6-d was dispatched (00:39) before the baselines line was added, so moved it to a new card
+  L6-e (deps L6-d): "baselines" block in final.json; L7-d now depends on L7-e + L6-e.

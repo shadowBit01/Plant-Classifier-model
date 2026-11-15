@@ -129,3 +129,11 @@ Append-only. One entry per dispatcher run. Format: AGENTS.md section 6.
 - Results: 0 merged, 0 dispatched, 0 blocked
 - Needs: none
 - Next: merge L1-d when DONE and dispatch the cards it unblocks (L2-e, L3-c, L6-c).
+
+## 2026-11-15 16:12 | DISPATCH | DONE
+- Did: run 17: pulled main (clean); merge_lanes.py merged L1 (L1-d, vl600), 0 failed; dispatched L2-e (Antigravity A / antigravity gemini-4-argon) and L4-c (Antigravity B / antigravity_2 gemini-3.8-flash), Local full-access, Plant-Classifier-model. No blocked items.
+- Files: worklog/DISPATCH.md
+- Tests: none
+- Results: 1 merged, 2 dispatched, 0 blocked
+- Needs: none
+- Next: merge L2-e / L4-c when DONE and dispatch what they unblock (L3-c, L6-c).

@@ -4,8 +4,17 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from vanalens.contracts import RANKS, Taxon
+from vanalens.contracts import Prediction, RANKS, Taxon
 from vanalens.pipeline import MockPipeline
+from app.app import (
+    add_species_fn,
+    average_log_probabilities,
+    is_confident,
+    is_open_set_reject,
+    predict_fn,
+    predict_observation,
+    _result_html,
+)
 
 
 def test_mock_prediction_contract():
@@ -82,3 +91,187 @@ def test_space_loads_state_from_env_cache(tmp_path, monkeypatch, taxa, clusters)
     assert abs(pipeline.T - 0.85) < 1e-6 and abs(pipeline.qhat - 0.42) < 1e-6
     assert len(pipeline.taxa) == len(taxa)
 
+
+def test_observation_predict_1_to_3_photos():
+    m = MockPipeline()
+    # 1 photo
+    p1 = predict_observation(m, ["leaf.jpg"])
+    assert isinstance(p1, Prediction)
+    # 2 photos
+    p2 = predict_observation(m, ["leaf.jpg", "flower.jpg"])
+    assert isinstance(p2, Prediction)
+    # 3 photos
+    p3 = predict_observation(m, ["leaf.jpg", "flower.jpg", "bark.jpg"])
+    assert isinstance(p3, Prediction)
+
+    # >3 photos raises ValueError
+    with pytest.raises(ValueError, match="1 to 3 photos"):
+        predict_observation(m, ["1.jpg", "2.jpg", "3.jpg", "4.jpg"])
+
+
+def test_single_photo_pipeline_fallback_averages_log_probs():
+    class SinglePhotoMock:
+        def __init__(self):
+            self.taxa = [
+                Taxon(0, "Species A", "GenusA", "FamilyA"),
+                Taxon(1, "Species B", "GenusA", "FamilyA"),
+            ]
+
+        def predict(self, path: str, lat=None, lon=None, use_rerank=True):
+            if isinstance(path, list):
+                raise TypeError("SinglePhotoMock only accepts a single photo string")
+            probs = np.array([0.7, 0.3]) if "photo1" in path else np.array([0.4, 0.6])
+            return Prediction(
+                probs=probs,
+                top_k=[(0, float(probs[0])), (1, float(probs[1]))],
+                pred_set=[0, 1],
+                rank="genus",
+                label="GenusA",
+                confidence=1.0,
+                evidence=["ref1.jpg"],
+                traits=["trait1"],
+                organ="leaf",
+            )
+
+    pipe = SinglePhotoMock()
+    # Should catch TypeError and call average_log_probabilities
+    combined = predict_observation(pipe, ["photo1.jpg", "photo2.jpg"])
+    assert isinstance(combined, Prediction)
+    # Log-probs: ln([0.7, 0.3]) and ln([0.4, 0.6]) averaged
+    expected_logp = 0.5 * (np.log([0.7, 0.3]) + np.log([0.4, 0.6]))
+    expected_p = np.exp(expected_logp - expected_logp.max())
+    expected_p /= expected_p.sum()
+    assert np.allclose(combined.probs, expected_p, atol=1e-5)
+
+
+def test_not_confident_display():
+    m = MockPipeline()
+    # Case A: conformal set has more than 1 species
+    pred_mult = Prediction(
+        probs=np.array([0.45, 0.35, 0.1, 0.05, 0.05]),
+        top_k=[(0, 0.45), (1, 0.35), (2, 0.1), (3, 0.05), (4, 0.05)],
+        pred_set=[0, 1],
+        rank="genus",
+        label="Ficus",
+        confidence=0.80,
+    )
+    assert not is_confident(pred_mult, m)
+    html_mult = _result_html(pred_mult, m)
+    assert "Not sure: " in html_mult
+    assert "Ficus religiosa" in html_mult
+    assert "Ficus benghalensis" in html_mult
+    assert "45.0%" in html_mult
+    assert "35.0%" in html_mult
+
+    # Case B: conformal set has 1 species, but top prob below state threshold (tau = 0.6 default)
+    pred_low_prob = Prediction(
+        probs=np.array([0.55, 0.15, 0.1, 0.1, 0.1]),
+        top_k=[(0, 0.55), (1, 0.15), (2, 0.1), (3, 0.1), (4, 0.1)],
+        pred_set=[0],
+        rank="genus",
+        label="Ficus",
+        confidence=0.55,
+    )
+    assert not is_confident(pred_low_prob, m)
+    html_low = _result_html(pred_low_prob, m)
+    assert "Not sure: " in html_low
+    assert "Ficus religiosa" in html_low
+    assert "55.0%" in html_low
+
+    # Case C: Confident prediction (1 species in set, prob >= threshold)
+    pred_conf = Prediction(
+        probs=np.array([0.85, 0.05, 0.05, 0.03, 0.02]),
+        top_k=[(0, 0.85), (1, 0.05)],
+        pred_set=[0],
+        rank="species",
+        label="Ficus religiosa",
+        confidence=0.85,
+    )
+    assert is_confident(pred_conf, m)
+    html_conf = _result_html(pred_conf, m)
+    assert "Not sure: " not in html_conf
+    assert "Ficus religiosa" in html_conf
+    assert "Confidence: 85.0%" in html_conf
+
+
+def test_openset_reject_display_and_add_species(monkeypatch):
+    m = MockPipeline()
+    monkeypatch.setattr("app.app._PIPELINE", m)
+
+    # Open-set reject prediction
+    pred_openset = Prediction(
+        probs=np.array([0.3, 0.25, 0.2, 0.15, 0.1]),
+        top_k=[(0, 0.3), (1, 0.25)],
+        pred_set=[0, 1],
+        rank="unknown",
+        label="",
+        confidence=0.3,
+        rationale="open-set gate: best gallery similarity 0.412 < 1.413 (species not in gallery?)",
+    )
+    assert is_open_set_reject(pred_openset)
+    html = _result_html(pred_openset, m)
+    assert "Not in catalog, closest genus/family Ficus" in html
+    assert "Add this species" in html
+
+    # Test predict_fn returns visible=True for open-set box
+    class MockOpenSetPipeline(MockPipeline):
+        def predict(self, paths, lat=None, lon=None, use_rerank=True):
+            p = super().predict(paths, lat=lat, lon=lon, use_rerank=use_rerank)
+            p.rank = "unknown"
+            p.label = ""
+            p.rationale = "open-set gate: best gallery similarity 0.350 < 1.413 (species not in gallery?)"
+            return p
+
+    monkeypatch.setattr("app.app._PIPELINE", MockOpenSetPipeline())
+    card, hint, add_box = predict_fn(["unknown_plant.jpg"])
+    assert "Not in catalog, closest genus/family" in card
+    # Gradio update dict or Component
+    visible_val = add_box.get("visible") if isinstance(add_box, dict) else getattr(add_box, "visible", True)
+    assert visible_val is True
+
+
+def test_add_species_fn_validation_and_execution(monkeypatch):
+    m = MockPipeline()
+    monkeypatch.setattr("app.app._PIPELINE", m)
+
+    # Missing name
+    err1 = add_species_fn("", photos=["p1.jpg"])
+    assert "Species name is required" in err1
+
+    # Missing photos
+    err2 = add_species_fn("Ficus elastica", photos=[])
+    assert "at least 1 reference photo" in err2
+
+    # > 10 photos
+    err3 = add_species_fn("Ficus elastica", photos=[f"p{i}.jpg" for i in range(11)])
+    assert "at most 10 photos" in err3
+
+    # Valid: 1 photo (up to 10 photos supported)
+    res1 = add_species_fn("Ficus elastica", photos=["p1.jpg"])
+    assert "Added **Ficus elastica**" in res1
+    assert m.taxa[-1].species == "Ficus elastica"
+    assert m.taxa[-1].genus == "Ficus"
+
+    # Valid: 5 photos
+    res5 = add_species_fn("Santalum album", photos=[f"s{i}.jpg" for i in range(5)])
+    assert "Added **Santalum album**" in res5
+    assert m.taxa[-1].species == "Santalum album"
+
+
+def test_predict_fn_photo_count_limits(monkeypatch):
+    m = MockPipeline()
+    monkeypatch.setattr("app.app._PIPELINE", m)
+
+    # 0 photos
+    card, _, _ = predict_fn([])
+    assert "upload at least one photo" in card
+
+    # >3 photos
+    card, _, _ = predict_fn(["1.jpg", "2.jpg", "3.jpg", "4.jpg"])
+    assert "1 to 3 photos" in card
+
+    # 1 to 3 photos succeeds
+    card1, _, _ = predict_fn(["1.jpg"])
+    assert "Prediction error" not in card1
+    card3, _, _ = predict_fn(["1.jpg", "2.jpg", "3.jpg"])
+    assert "Prediction error" not in card3

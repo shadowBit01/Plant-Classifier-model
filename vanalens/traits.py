@@ -182,6 +182,14 @@ CURATED_TRAITS: dict[str, list[str]] = {
         "very large flattened woody dark brown hanging pods",
         "smooth grey bark with buttressed trunk base",
     ],
+    "Diplocyclos palmatus": [
+        "slender climbing vine with bifid tendrils",
+        "deeply palmately five-lobed leaves with toothed margins",
+        "globose marble-like berry fruits with longitudinal white stripes",
+        "unripe green fruits with white markings turning brick-red",
+        "small yellowish-white unisexual flowers clustered in leaf axils",
+        "conspicuous white speckled dots on upper leaf surfaces",
+    ],
     "Drosera burmanni": [
         "compact flat ground-hugging circular rosette of carnivorous leaves",
         "wedge-shaped spatulate yellowish-green to reddish glandular leaves",

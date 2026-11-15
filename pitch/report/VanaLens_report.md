@@ -285,7 +285,7 @@ Every VanaLens number carries a 95% percentile bootstrap interval from 1,000 res
 - **Single scorers**: kNN gallery alone and text prototypes alone (0 images per species).
 - **B4 general vision-language model**, open-ended. Not run: no LLM key.
 
-B1 (Pl@ntNet-300K ResNet weights) was omitted to stay within compute budget (a fine-tuned encoder reference row is listed as a next step in Section 8), and no campus photo set was collected during this build.
+B1 (Pl@ntNet-300K ResNet weights) was left out to stay within the time budget (a fine-tuned encoder reference row is listed as a next step in Section 8), and no campus photo set was collected during this build.
 
 ## Results
 

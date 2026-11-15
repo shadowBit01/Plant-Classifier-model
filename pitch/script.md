@@ -11,7 +11,7 @@ Everyone walks past plants they cannot name: a tree on the street, a herb in a m
 ## 3. Prior plant ID: no sets, no unknowns, retrain to add. (1:04 to 1:42)
 Plant ID is not new. Leafsnap matched leaf outlines; Indian work trains CNNs on a few dozen clean leaf photos and must retrain for every new species; Pl@ntNet, Lens and Seek are closed and give a ranked answer. BioCLIP 2 and DINOv2, which we build on, are encoders, not full systems. Each cell says only what the paper reports. The last row is the point: VanaLens combines calibrated confidence, 90% sets, genus backoff, an open-set gate, 5-shot species addition, visible evidence, location and multi-photo fusion in one system.
 
-## 4. VanaLens: 96.0% top-1, calibrated doubt, 5-shot updates. (1:42 to 2:16)
+## 4. VanaLens: 96.0% on 3 photos, calibrated, 5-shot. (1:42 to 2:16)
 VanaLens is built on frozen BioCLIP 2 and DINOv2 features with light trained heads (linear probe and MLP), fused and calibrated on a held-out split. Three design choices shape the user experience. First, fast species updates: a new species is added in seconds from five photos without retraining. Second, calibrated uncertainty: confidence matches accuracy, with genus or family backoff and a 'not in catalog' check. Third, context fusion: up to three photos of the same plant and a GBIF location prior.
 
 ## 5. Frozen encoders, trained heads, then calibration decides. (2:16 to 2:56)
@@ -26,19 +26,19 @@ We built our own dataset, vl600, from iNaturalist research-grade observations. I
 ## 8. Ahead of BioCLIP 2 zero-shot on 12,831 new photos. (4:15 to 4:55)
 On 12,831 test photos, BioCLIP 2 zero-shot gets 87.3% when we give it our 607 names, and 61.6% open-ended. A linear probe on our embeddings gets 93.4%. VanaLens with one photo and its location gets 94.4%, and with up to three photos of the same plant 96.0%. Error bars are 95% bootstrap intervals; the BioCLIP 2 runs have no per-photo file, so no interval. We could not run the Pl@ntNet API or a VLM baseline because we had no API keys. On our second test set, inat_india, the picture is the same: 96.4% versus 93.5%.
 
-## 9. Same photos: far ahead of zero-shot, level with a probe. (4:55 to 5:31)
-Every bar uses the same 12,831 test photos and the same frozen features, nothing tuned on test. Against BioCLIP 2 zero-shot with our 607 names we are +6.8 points ahead. Against the best baseline, a linear probe on both encoders, one photo gives only +0.6 points and the intervals overlap, so we do not claim a big win there; three photos and location give +2.6 points. The real gap is what the baselines cannot do: sets, genus backoff, unknown check, new species, evidence.
+## 9. Same photos: +6.8 vs zero-shot, +2.6 vs probe (3 photos). (4:55 to 5:30)
+Every bar uses the same 12,831 test photos and the same frozen features, nothing tuned on test. Against BioCLIP 2 zero-shot with our 607 names we are +6.8 points ahead. Against the best baseline, a linear probe on both encoders, one photo gives +0.6 points and the intervals overlap, so that single-photo gain alone is not statistically clear; three photos and location give +2.6 points. The bigger difference is what the baselines cannot output: sets, genus backoff, unknown check, new species, evidence.
 
-## 10. Up to three photos push top-1 accuracy past 95%. (5:31 to 6:11)
+## 10. Up to three photos push top-1 accuracy past 95%. (5:30 to 6:10)
 One photo gives 94.0%. Adding the location prior lifts it to 94.4%. Letting the user add up to three photos of the same plant lifts it to 96.0%, with the whole confidence interval above 95%. One photo alone stays just short of the 95% target. We also tried letting the model abstain when unsure, but the threshold chosen on calibration answers 100% of test photos, so it does nothing here. The safer fallback is the taxonomy: if it backs off to genus or family when unsure, it is right 97.1% of the time.
 
-## 11. Calibrated confidence matches how often it is right. (6:11 to 6:53)
+## 11. Calibrated confidence matches how often it is right. (6:10 to 6:53)
 Calibration error is low for every model here: 1.0% for the linear probe, 0.6% for the fused scores before temperature and 0.6% after, 0.9% for the final ensemble. When VanaLens says 90%, it is right about 90% of the time, and it turns those calibrated scores into decisions. On top we use split conformal prediction with a 90% target: the true species was in the set 94.0% of the time. Because top-1 is already above 90%, the set is usually a single species (mean size 1.0), so adaptive sets (APS/RAPS) at 95% or 98% are a natural next step.
 
-## 12. Add a new species with 5 photos and no retraining. (6:53 to 7:32)
+## 12. Add a new species with 5 photos and no retraining. (6:53 to 7:31)
 To test plants it has never seen, we hid 61 species from the catalog. VanaLens flagged 38% of those photos as 'not in catalog', while also flagging 6% of known photos, so this simple similarity gate is a baseline-strength detector (AUROC 0.85) with headroom for a learned multi-signal gate. Then we added the hidden species back with only a few photos each, no retraining. With 5 photos per species, they are named correctly 81% of the time, with 10 photos 87%, and accuracy on the old species stays at 94.0%.
 
-## 13. The app shows the answer, the evidence, and its doubt. (7:32 to 8:00)
+## 13. The app shows the answer, the evidence, and its doubt. (7:31 to 8:00)
 This is the VanaLens app, running locally. You upload one to three photos and, optionally, the location. The result card shows the species, a calibrated confidence, the 90% set, the written traits that matched, and the nearest reference photos from the gallery as evidence. A second tab adds a new species from a few photos. On CPU it takes about 4.6 seconds per observation once warm.
 
 ## 14. Current scope and concrete next steps. (8:00 to 8:53)

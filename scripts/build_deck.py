@@ -585,7 +585,7 @@ def build() -> None:
           size=13, row_h=0.5)
 
     # 3b. what we built
-    s = deck.slide(f"VanaLens: {pct(three['top1'])} top-1, calibrated doubt, 5-shot updates.", (
+    s = deck.slide(f"VanaLens: {pct(three['top1'])} on 3 photos, calibrated, 5-shot.", (
         "VanaLens is built on frozen BioCLIP 2 and DINOv2 features with light trained heads (linear probe and MLP), "
         "fused and calibrated on a held-out split. Three design choices shape the user experience. First, fast species "
         "updates: a new species is added in seconds from five photos without retraining. Second, calibrated uncertainty: "
@@ -722,12 +722,13 @@ def build() -> None:
     # 6b. head-to-head
     hd = d["h2h_d"]
     pend = [r for r in d["h2h"] if r["source"] == "pending L6-e"]
-    s = deck.slide("Same photos: far ahead of zero-shot, level with a probe.", (
+    s = deck.slide(f"Same photos: {hd['h2h_gain_zs'].replace(' points', '')} vs zero-shot, "
+                   f"{hd['h2h_gain_best3'].replace(' points', '')} vs probe (3 photos).", (
         f"Every bar uses the same {one['n']:,} test photos and the same frozen features, nothing tuned on test. "
         f"Against BioCLIP 2 zero-shot with our 607 names we are {hd['h2h_gain_zs']} ahead. Against the best baseline, a "
-        f"linear probe on both encoders, one photo gives only {hd['h2h_gain_best']} and the intervals overlap, so we do "
-        f"not claim a big win there; three photos and location give {hd['h2h_gain_best3']}. The real gap is what the "
-        "baselines cannot do: sets, genus backoff, unknown check, new species, evidence."
+        f"linear probe on both encoders, one photo gives {hd['h2h_gain_best']} and the intervals overlap, so that single-photo gain alone is not "
+        f"statistically clear; three photos and location give {hd['h2h_gain_best3']}. The bigger difference is what the "
+        "baselines cannot output: sets, genus backoff, unknown check, new species, evidence."
         + (" Bars marked not measured yet come from the baselines run." if pend else "")),
         foot="Same vl600 test split for every bar. Error bars: 95% bootstrap CI by observation; BioCLIP 2 zero-shot "
              "has no per-photo file, so no CI.")

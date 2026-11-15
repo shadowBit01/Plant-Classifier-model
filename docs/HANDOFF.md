@@ -87,3 +87,9 @@ Never cut: baseline table, conformal sets, evidence panel, inat_india test split
   as fix cards); lanes merge main instead of rebasing; B4 added to L4-b; L6-b no longer merges.
 - 04:10 Single T3 project: lanes work in .lanes/LX worktrees created by scripts/lane.py (which also logs STARTED);
   PCM-L* projects and make_worktrees.ps1 retired; commits on main limited to human-owned files.
+- 2026-11-15 14:40 Wave 2 (human request, via supervisor): new dataset vl600 (~400 top India + ~200 top world
+  plant species + a fixed common-Indian list, selection by observation count only, up to 80 pre-2025-07-01 photos
+  + 15 post-cutoff test obs per species, iNat open-data bucket). New cards L1-d, L2-e, L3-c, L4-c, L5-c, L6-c,
+  L7-b, L7-c. L7-a deps -> L6-c (already DONE, so L7-b also depends on L6-c and rebuilds the deck). L3-c also
+  waits for L4-c so fusion includes text. L3-c may use the GPU (L2 has no GPU work after L2-e). Report lives in
+  pitch/report/ (owned by L7) instead of report/, which has no owner.

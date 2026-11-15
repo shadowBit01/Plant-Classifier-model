@@ -242,7 +242,7 @@ def _chips_html(pred_set: list[int], taxa_map: dict[int, str], probs: np.ndarray
             prob_str = ""
         chip_items.append(
             f'<span style="display:inline-block;background:#e8f5e9;border:1px solid #81c784;'
-            f'border-radius:16px;padding:2px 10px;margin:2px 3px;font-size:0.85em">'
+            f'border-radius:16px;padding:2px 10px;margin:2px 3px;font-size:0.85em;color:#1b5e20">'
             f'{name}{prob_str}</span>'
         )
     chips = "".join(chip_items)
@@ -256,7 +256,7 @@ def _chips_html(pred_set: list[int], taxa_map: dict[int, str], probs: np.ndarray
 def _traits_html(pred: Prediction) -> str:
     if getattr(pred, "traits", None):
         items = "".join(f"<li>{t}</li>" for t in pred.traits)
-        return f"<ul style='margin:4px 0 0 16px;padding:0'>{items}</ul>"
+        return f"<ul style='margin:4px 0 0 16px;padding:0;color:#1a1a1a'>{items}</ul>"
     return ""
 
 
@@ -264,11 +264,11 @@ def _evidence_html(pred: Prediction) -> str:
     if getattr(pred, "evidence", None):
         spans = "".join(
             f'<span style="display:inline-block;background:#f5f5f5;border:1px solid #ddd;'
-            f'border-radius:4px;padding:2px 7px;margin:2px 2px;font-size:0.8em;font-family:monospace">'
+            f'border-radius:4px;padding:2px 7px;margin:2px 2px;font-size:0.8em;font-family:monospace;color:#1a1a1a">'
             f'{e}</span>'
             for e in pred.evidence[:3]
         )
-        return f'<div style="margin-top:8px"><strong>Nearest references:</strong><br>{spans}</div>'
+        return f'<div style="margin-top:8px;color:#1a1a1a"><strong>Nearest references:</strong><br>{spans}</div>'
     return ""
 
 
@@ -292,7 +292,7 @@ def _result_html(pred: Prediction, pipeline) -> str:
     if organ == "other" or "organ gate" in rationale.lower():
         return (
             '<div style="border:2px solid #e57373;border-radius:12px;padding:16px;'
-            'background:#ffebee;margin:8px 0">'
+            'background:#ffebee;margin:8px 0;color:#1a1a1a">'
             '<div style="font-size:1.3em;font-weight:700;color:#c62828">'
             'Photo does not look like a plant</div>'
             '<p style="color:#666;margin:4px 0 0">'
@@ -308,7 +308,7 @@ def _result_html(pred: Prediction, pipeline) -> str:
         rationale_html = _rationale_html(pred)
         return (
             '<div style="border:2px solid #ef5350;border-radius:12px;padding:16px;'
-            'background:#fff8e1;margin:8px 0">'
+            'background:#fff8e1;margin:8px 0;color:#1a1a1a">'
             f'<div style="font-size:1.3em;font-weight:700;color:#c62828">'
             f'Not in catalog, closest genus/family {closest}</div>'
             f'{fam_html}'
@@ -344,7 +344,7 @@ def _result_html(pred: Prediction, pipeline) -> str:
         member_list_html = (
             f'<div style="margin:8px 0">'
             f'<div style="font-weight:600;color:#555;margin-bottom:4px">Prediction set members &amp; probabilities:</div>'
-            f'<ul style="margin:4px 0 8px 20px;padding:0">{"".join(items)}</ul>'
+            f'<ul style="margin:4px 0 8px 20px;padding:0;color:#1a1a1a">{"".join(items)}</ul>'
             f'</div>'
         )
 
@@ -358,7 +358,7 @@ def _result_html(pred: Prediction, pipeline) -> str:
 
         return (
             '<div style="border:2px solid #ffb74d;border-radius:12px;padding:16px;'
-            'background:#fffde7;margin:8px 0">'
+            'background:#fffde7;margin:8px 0;color:#1a1a1a">'
             f'<div style="font-size:1.3em;font-weight:700;color:#e65100;margin-bottom:4px">'
             f'Not sure: {members_str}</div>'
             f'{rank_info}'
@@ -371,7 +371,7 @@ def _result_html(pred: Prediction, pipeline) -> str:
         )
 
     # Case 4: Confident prediction
-    label_html = f'<span style="font-size:1.3em;font-weight:700">{pred.label}</span>'
+    label_html = f'<span style="font-size:1.3em;font-weight:700;color:#1a1a1a">{pred.label}</span>'
     conf_pct = f"{pred.confidence * 100:.1f}%"
     chips = _chips_html(pred.pred_set, taxa_map, getattr(pred, "probs", None)) if pred.pred_set else ""
     traits_html = _traits_html(pred)
@@ -380,7 +380,7 @@ def _result_html(pred: Prediction, pipeline) -> str:
 
     return (
         '<div style="border:2px solid #81c784;border-radius:12px;padding:16px;'
-        'background:#f9fbe7;margin:8px 0">'
+        'background:#f9fbe7;margin:8px 0;color:#1a1a1a">'
         f'<div style="margin-bottom:4px">{label_html}</div>'
         f'<div style="color:#2e7d32;font-weight:600">Confidence: {conf_pct}</div>'
         f'{chips}'
@@ -394,7 +394,7 @@ def _result_html(pred: Prediction, pipeline) -> str:
 def _hint_html() -> str:
     return (
         '<div style="background:#fff3e0;border:1px solid #ffb300;border-radius:8px;'
-        'padding:10px;margin-top:8px">'
+        'padding:10px;margin-top:8px;color:#1a1a1a">'
         '📸 <strong>Tip:</strong> Adding a flower photo often narrows the species identification.'
         '</div>'
     )
@@ -549,6 +549,8 @@ body { font-family: system-ui, sans-serif; }
 }
 
 #result-card { min-height: 60px; }
+#result-card > div, #hint-row > div { color: #1a1a1a; }
+#result-card li, #result-card strong, #result-card p, #hint-row strong { color: inherit; }
 """
 
 

@@ -1,0 +1,92 @@
+{
+ "dataset": "inat_india",
+ "split": "test",
+ "n_test": 558,
+ "state": {
+  "dataset": "inat_india",
+  "created": "2026-11-15 13:48",
+  "n_classes": 52,
+  "scorers": [
+   "knn",
+   "probe",
+   "text"
+  ],
+  "weights": {
+   "knn": 0.0,
+   "probe": 0.8,
+   "text": 0.2
+  },
+  "T": 0.5983075272601287,
+  "alpha": 0.1,
+  "qhat": 0.4634852750253313,
+  "thr": 1.413437795639038,
+  "knn": {
+   "k": 10,
+   "temperature": 0.05
+  },
+  "probe": {
+   "C": 100.0
+  },
+  "text": {
+   "temperature": 0.01,
+   "protos": "C:\\Users\\divya\\vanalens-cache\\text\\inat_india.npz",
+   "missing_species": [
+    "Diplocyclos palmatus",
+    "Leonotis nepetifolia"
+   ]
+  },
+  "n": {
+   "gallery": 692,
+   "cal": 178,
+   "test": 558
+  }
+ },
+ "rows": {
+  "knn": {
+   "top1": 0.8118,
+   "top5": 0.9427,
+   "macro_top1": 0.7956,
+   "nll": 1.729,
+   "ece": 0.1225
+  },
+  "probe": {
+   "top1": 0.9211,
+   "top5": 0.9875,
+   "macro_top1": 0.9057,
+   "nll": 0.438,
+   "ece": 0.163
+  },
+  "text": {
+   "top1": 0.4982,
+   "top5": 0.991,
+   "macro_top1": 0.4844,
+   "nll": 1.9842,
+   "ece": 0.2314
+  },
+  "fused": {
+   "top1": 0.9534,
+   "top5": 0.9946,
+   "macro_top1": 0.9418,
+   "nll": 0.2611,
+   "ece": 0.1066
+  },
+  "fused+T": {
+   "top1": 0.9534,
+   "top5": 0.9946,
+   "macro_top1": 0.9418,
+   "nll": 0.1732,
+   "ece": 0.0232
+  },
+  "fused+T+sets": {
+   "top1": 0.9534,
+   "top5": 0.9946,
+   "macro_top1": 0.9418,
+   "nll": 0.1732,
+   "ece": 0.0232,
+   "coverage": 0.9534,
+   "mean_set_size": 1.0,
+   "singleton_rate": 1.0,
+   "unknown_rate": 0.0663
+  }
+ }
+}

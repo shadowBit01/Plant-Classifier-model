@@ -334,3 +334,8 @@ Append-only. One entry per dispatcher run. Format: AGENTS.md section 6.
 - Did: run 48: pulled main (clean); L2-f stale: its thread failed at 20:58 with Antigravity quota (fix_dino job died at vl600_gallery shard 9/20). L2 provider -> Claude (PLAN.json + HANDOFF), re-dispatched L2-f --resume on Claude.
 - Needs: none
 - Next: merge L2 when L2-f DONE, then dispatch L3-d.
+
+## 2026-11-16 00:12 | DISPATCH | DONE
+- Did: run 49: pulled main (clean); nothing to merge or unblock; dispatched L7-c (project report) on Claude, in parallel with L2-f (still in flight).
+- Needs: none
+- Next: merge L2 when L2-f DONE, then dispatch L3-d; merge L7 when L7-c DONE.

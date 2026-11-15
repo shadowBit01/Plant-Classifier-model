@@ -7,13 +7,18 @@ import pytest
 from vanalens.contracts import Prediction, RANKS, Taxon
 from vanalens.pipeline import MockPipeline
 from app.app import (
+    MOBILE_CSS,
     add_species_fn,
     average_log_probabilities,
     is_confident,
     is_open_set_reject,
     predict_fn,
     predict_observation,
+    _chips_html,
+    _evidence_html,
+    _hint_html,
     _result_html,
+    _traits_html,
 )
 
 
@@ -275,3 +280,103 @@ def test_predict_fn_photo_count_limits(monkeypatch):
     assert "Prediction error" not in card1
     card3, _, _ = predict_fn(["1.jpg", "2.jpg", "3.jpg"])
     assert "Prediction error" not in card3
+
+
+def test_dark_mode_contrast_colors():
+    m = MockPipeline()
+
+    # 1. _result_html outer card divs, labels, lists
+    # Case 1: Organ gate reject
+    pred_organ = Prediction(
+        probs=np.array([1.0, 0.0, 0.0, 0.0, 0.0]),
+        top_k=[(0, 1.0)],
+        pred_set=[0],
+        rank="species",
+        label="Unknown",
+        confidence=1.0,
+        organ="other",
+        rationale="organ gate reject",
+    )
+    html_organ = _result_html(pred_organ, m)
+    assert '<div style="border:2px solid #e57373;border-radius:12px;padding:16px;background:#ffebee;margin:8px 0;color:#1a1a1a">' in html_organ
+
+    # Case 2: Open-set reject
+    pred_openset = Prediction(
+        probs=np.array([0.3, 0.25, 0.2, 0.15, 0.1]),
+        top_k=[(0, 0.3), (1, 0.25)],
+        pred_set=[0, 1],
+        rank="unknown",
+        label="",
+        confidence=0.3,
+        rationale="open-set gate: best gallery similarity 0.412 < 1.413",
+    )
+    html_openset = _result_html(pred_openset, m)
+    assert '<div style="border:2px solid #ef5350;border-radius:12px;padding:16px;background:#fff8e1;margin:8px 0;color:#1a1a1a">' in html_openset
+
+    # Case 3: Not confident
+    pred_not_conf = Prediction(
+        probs=np.array([0.45, 0.35, 0.1, 0.05, 0.05]),
+        top_k=[(0, 0.45), (1, 0.35)],
+        pred_set=[0, 1],
+        rank="genus",
+        label="Ficus",
+        confidence=0.80,
+    )
+    html_not_conf = _result_html(pred_not_conf, m)
+    assert '<div style="border:2px solid #ffb74d;border-radius:12px;padding:16px;background:#fffde7;margin:8px 0;color:#1a1a1a">' in html_not_conf
+    assert '<ul style="margin:4px 0 8px 20px;padding:0;color:#1a1a1a">' in html_not_conf
+
+    # Case 4: Confident
+    pred_conf = Prediction(
+        probs=np.array([0.85, 0.05, 0.05, 0.03, 0.02]),
+        top_k=[(0, 0.85), (1, 0.05)],
+        pred_set=[0],
+        rank="species",
+        label="Ficus religiosa",
+        confidence=0.85,
+    )
+    html_conf = _result_html(pred_conf, m)
+    assert '<div style="border:2px solid #81c784;border-radius:12px;padding:16px;background:#f9fbe7;margin:8px 0;color:#1a1a1a">' in html_conf
+    assert '<span style="font-size:1.3em;font-weight:700;color:#1a1a1a">Ficus religiosa</span>' in html_conf
+
+    # 2. _chips_html species chip spans
+    taxa_map = {0: "Ficus religiosa", 1: "Ficus benghalensis"}
+    chips_html = _chips_html([0, 1], taxa_map, np.array([0.6, 0.4]))
+    assert "color:#1b5e20" in chips_html
+    assert 'border-radius:16px;padding:2px 10px;margin:2px 3px;font-size:0.85em;color:#1b5e20' in chips_html
+
+    # 3. _traits_html ul
+    pred_with_traits = Prediction(
+        probs=np.array([1.0]),
+        top_k=[(0, 1.0)],
+        pred_set=[0],
+        rank="species",
+        label="Ficus religiosa",
+        confidence=1.0,
+        traits=["broad leaves", "milky sap"],
+    )
+    traits_html = _traits_html(pred_with_traits)
+    assert "<ul style='margin:4px 0 0 16px;padding:0;color:#1a1a1a'>" in traits_html
+
+    # 4. _evidence_html wrapper div and reference spans
+    pred_with_evidence = Prediction(
+        probs=np.array([1.0]),
+        top_k=[(0, 1.0)],
+        pred_set=[0],
+        rank="species",
+        label="Ficus religiosa",
+        confidence=1.0,
+        evidence=["ref1.jpg", "ref2.jpg"],
+    )
+    evidence_html = _evidence_html(pred_with_evidence)
+    assert '<div style="margin-top:8px;color:#1a1a1a"><strong>Nearest references:</strong>' in evidence_html
+    assert 'font-family:monospace;color:#1a1a1a">ref1.jpg</span>' in evidence_html
+
+    # 5. _hint_html div
+    hint_html = _hint_html()
+    assert '<div style="background:#fff3e0;border:1px solid #ffb300;border-radius:8px;padding:10px;margin-top:8px;color:#1a1a1a">' in hint_html
+
+    # 6. MOBILE_CSS rules
+    assert '#result-card > div, #hint-row > div { color: #1a1a1a; }' in MOBILE_CSS
+    assert '#result-card li, #result-card strong, #result-card p, #hint-row strong { color: inherit; }' in MOBILE_CSS
+

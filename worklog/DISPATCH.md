@@ -209,3 +209,11 @@ Append-only. One entry per dispatcher run. Format: AGENTS.md section 6.
 - Results: 1 merged, 1 dispatched, 0 blocked
 - Needs: none
 - Next: L3-c in flight; merge L3 when DONE, then dispatch what it unblocks (L6-c).
+
+## 2026-11-15 18:40 | DISPATCH | DONE
+- Did: run 27: nothing to merge, dispatch or unblock; L3-c still in flight.
+- Files: worklog/DISPATCH.md
+- Tests: none
+- Results: 0 merged, 0 dispatched, 0 blocked
+- Needs: none
+- Next: merge L3 when L3-c is DONE, then dispatch L6-c.

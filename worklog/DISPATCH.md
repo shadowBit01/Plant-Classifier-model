@@ -65,3 +65,11 @@ Append-only. One entry per dispatcher run. Format: AGENTS.md section 6.
 - Results: 2 merged, 2 dispatched, 0 blocked
 - Needs: none
 - Next: L5-b builds space/, L6-b builds runs/L6/final.json; next run merges them and dispatches L7 (pitch).
+
+## 2026-11-15 14:23 | DISPATCH | DONE
+- Did: pulled main (clean); merge_lanes.py merged L6 (L6-b), 0 failed; dispatched L7-a (Claude opus-5-5), Local full-access, Plant-Classifier-model. L5-b still in flight. No blocked items.
+- Files: worklog/DISPATCH.md
+- Tests: lane gate tests run by merge_lanes.py (passed)
+- Results: 1 merged, 1 dispatched, 0 blocked
+- Needs: none
+- Next: merge L5-b (space/) and L7-a (pitch deck) when DONE; then PROJECT COMPLETE if all_done.

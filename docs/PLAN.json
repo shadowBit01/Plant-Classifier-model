@@ -1,5 +1,5 @@
 {
- "stale_minutes": 240,
+ "stale_minutes": 230,
  "max_threads_per_provider": 2,
  "lanes": {
   "L1": {

@@ -97,5 +97,5 @@ Never cut: baseline table, conformal sets, evidence panel, inat_india test split
   likely not coming, vl600 is the main dataset; accuracy target 95%+. Added honest accuracy levers: L2-e flip TTA
   + 2 augmented gallery views (X_aug/y_aug, extra npz keys), L3-c aug training, label smoothing, ensemble,
   all chosen on cal; L6-c reports which metrics reach 95%. No species dropped, no tuning on test.
-- 2026-11-15 17:58 stale_minutes 120 -> 240: L2-e (61k images, flip TTA, ~12 img/s) is healthy at 1h45m and
+- 2026-11-15 17:58 stale_minutes 120 -> 230 (240 breaks test_next_cards_stale_and_blocked): L2-e (61k images, flip TTA, ~12 img/s) is healthy at 1h45m and
   would be re-dispatched at 18:12, putting a second GPU job on the 6 GB card. Long vl600 jobs need more headroom.

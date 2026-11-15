@@ -217,3 +217,11 @@ Append-only. One entry per dispatcher run. Format: AGENTS.md section 6.
 - Results: 0 merged, 0 dispatched, 0 blocked
 - Needs: none
 - Next: merge L3 when L3-c is DONE, then dispatch L6-c.
+
+## 2026-11-15 18:57 | DISPATCH | DONE
+- Did: run 28: merged L3 (L3-c); dispatched L6-c (Claude).
+- Files: worklog/DISPATCH.md
+- Tests: merge gate tests passed (merge_lanes.py)
+- Results: 1 merged, 1 dispatched, 0 blocked
+- Needs: none
+- Next: L6-c in flight; merge L6 when DONE, then dispatch what it unblocks (L7 cards).

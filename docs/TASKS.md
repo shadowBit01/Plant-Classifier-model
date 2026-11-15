@@ -110,7 +110,8 @@ vanalens/data.py, manifests via scripts/make_manifests.py.
    Up to 80 photos observed before 2025-07-01 (gallery + cal) and up to 15 observations on or after 2025-07-01
    (test), at most 3 photos per observation; prefer observations in India, fill from worldwide. Medium size.
    API list calls at most 1 request/second with a User-Agent. Photo files ONLY from the iNaturalist AWS open data
-   bucket: https://inaturalist-open-data.s3.amazonaws.com/photos/<photo_id>/medium.<ext>. Save
+   bucket: https://inaturalist-open-data.s3.amazonaws.com/photos/<photo_id>/medium.<ext>, with 8 parallel download
+   workers (the 1 request/second limit is for API calls only) and retries with backoff. Save
    $VANALENS_DATA/vl600/<Genus species>/<obs_id>_<photo_id>.jpg and meta.csv
    (image,obs_id,photo_id,lat,lon,observed_on,license,url,quality_grade,in_india).
    Resumable (skip existing files, checkpoint API progress); run in the background with output to

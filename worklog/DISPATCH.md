@@ -379,3 +379,8 @@ Append-only. One entry per dispatcher run. Format: AGENTS.md section 6.
 - Did: run 57: pulled main (clean); merged L7 (L7-d review, refreshed numbers, rebuilt deck + PDF) via merge_lanes.py; no blocked; dispatched L7-f (final framing pass) on Claude.
 - Needs: HUMAN: review stashes "autopilot" from runs 51 and 54 (regenerated pitch/report files)
 - Next: merge L7 after L7-f DONE; then all_done should be true -> PROJECT COMPLETE.
+
+## 2026-11-16 01:54 | DISPATCH | DONE
+- Did: run 58: pulled main (clean); nothing to merge; no blocked; nothing to dispatch; L7-f in flight.
+- Needs: HUMAN: review stashes "autopilot" from runs 51 and 54 (regenerated pitch/report files)
+- Next: merge L7 after L7-f DONE; then all_done should be true -> PROJECT COMPLETE.

@@ -1,0 +1,28 @@
+{
+  "species": 607,
+  "species_by_source": {
+    "india": 400,
+    "world": 200,
+    "common": 7
+  },
+  "photos": 61367,
+  "photos_per_split": {
+    "gallery": 38826,
+    "cal": 9710,
+    "test": 12831,
+    "pre_uncapped": 38826
+  },
+  "observations_per_split": {
+    "gallery": 27615,
+    "cal": 6915,
+    "test": 9097,
+    "total": 43627
+  },
+  "gb": 9.6288,
+  "coverage_pct": 71.62,
+  "covered_india_observations": 289374,
+  "total_india_observations": 404029,
+  "species_lt5_test_obs": 0,
+  "species_with_lt5_test_observations": [],
+  "campus": "skipped (no $VANALENS_DATA/campus)"
+}

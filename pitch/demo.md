@@ -36,7 +36,7 @@ Photos are iNaturalist observations (CC BY or CC BY-NC); show the observation nu
 2. **An unknown plant, then teach it (50 s).** Upload `2_orchid.jpg`, a *Vanda tessellata* orchid. It is not one
    of the 607 species. Expected: a "not sure" card whose best guess is a different orchid (*Rhynchostylis retusa*,
    about 72%). Say honestly: "It does not know this orchid. Its unknown check did not fire here; for close relatives
-   of known species it usually does not, which is our weakest part. But it did not claim to be sure."
+   of known species it usually does not, which is the part with the most room to improve. But it did not claim to be sure."
    Then tab "Add a species": name *Vanda tessellata*, genus *Vanda*, family *Orchidaceae*, upload the 5 photos in
    `2_orchid_add\`, Add. Back to "Identify", upload `2_orchid.jpg` again. Expected: *Vanda tessellata*, about 98%.
    Say: "five photos, no retraining, a few seconds".

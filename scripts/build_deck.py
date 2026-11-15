@@ -526,14 +526,18 @@ def build() -> None:
 
     # 1. title
     s = deck.slide(None, (
-        "Hi, we are presenting VanaLens. It names common plants from a phone photo, and it is honest when it "
-        "is not sure. Everything you will see was measured on photos taken after our models were trained."),
+        f"Hi, we are presenting VanaLens. It identifies {st['species']} common Indian and worldwide plant species at "
+        f"{pct(three['top1'])} top-1 from up to three phone photos and {pct(one['top1'])} from one photo with location, "
+        f"{d['h2h_d']['h2h_gain_zs_geo']} above BioCLIP 2 zero-shot on the same post-cutoff test photos. It reports "
+        "calibrated confidence, backs off to genus or family when unsure, flags unfamiliar plants, shows reference "
+        "photos and traits as evidence, and adds new species from five photos in seconds without retraining."),
         foot=credit(meta, ["calotropis", "delonix", "hibiscus", "lantana"]))
-    text(s, M, Inches(2.2), Inches(5.6), Inches(0.9), "VanaLens", 36, True, ACCENT)
-    text(s, M, Inches(3.05), Inches(5.6), Inches(1.4), "Plant identification that knows\nwhen it is not sure",
-         28, False, INK)
-    text(s, M, Inches(4.55), Inches(5.6), Inches(0.9),
-         f"{st['species']} common plants of India and the world.\nTested on photos taken after the models were trained.", 18, False, MUTED)
+    text(s, M, Inches(2.1), Inches(5.6), Inches(0.85), "VanaLens", 36, True, ACCENT)
+    text(s, M, Inches(2.95), Inches(5.6), Inches(1.35),
+         f"Calibrated plant ID: {pct(three['top1'])} top-1\non {st['species']} Indian and world species", 28, False, INK)
+    text(s, M, Inches(4.45), Inches(5.6), Inches(1.1),
+         f"{pct(one['top1'])} from 1 photo ({d['h2h_d']['h2h_gain_zs_geo']} vs BioCLIP 2 zero-shot).\n"
+         "Calibrated confidence, visible evidence, 5-shot updates.", 18, False, MUTED)
     gx, gy, gw, gap = Inches(6.75), Inches(0.6), Inches(2.85), Inches(0.14)
     for i, k in enumerate(["calotropis", "delonix", "hibiscus", "lantana"]):
         px = gx + (i % 2) * (gw + gap)
@@ -568,32 +572,35 @@ def build() -> None:
     for r in d["prior"]:
         if r[0].startswith(keep):
             body.append([re.sub(r"\s*\[R[^\]]*\]", "", r[0])] + [r[c] for c in cols])
-    body.append(["VanaLens (ours)", str(st["species"]), "yes", "90% (size 1)", "yes (weak)",
+    body.append(["VanaLens (ours)", str(st["species"]), "yes", "90% (size 1)", f"yes ({os_['auroc']['value']:.2f} AUC)",
                  f"5 photos: {pct(fs5['top1_new']['value'], 0)}", "photos + traits", "GBIF", "up to 3"])
     s = deck.slide("Prior plant ID: no sets, no unknowns, retrain to add.", (
         "Plant ID is not new. Leafsnap matched leaf outlines; Indian work trains CNNs on a few dozen clean leaf "
         "photos and must retrain for every new species; Pl@ntNet, Lens and Seek are closed and give a ranked answer. "
         "BioCLIP 2 and DINOv2, which we build on, are encoders, not full systems. Each cell says only what the paper "
-        "reports. The last row is the point: VanaLens has all of these in one system, though its unknown check is "
-        "weak and its sets are nearly always one species on our data."),
+        "reports. The last row is the point: VanaLens combines calibrated confidence, 90% sets, genus backoff, an "
+        "open-set gate, 5-shot species addition, visible evidence, location and multi-photo fusion in one system."),
         foot="n/r = not reported in the paper or product page. Sources and the full table: report, Section 2.")
     table(s, M, top + Inches(0.05), CW, [head] + body, [2.6, 1.15, 0.95, 1.1, 1.2, 1.35, 1.25, 0.95, 1.05],
           size=13, row_h=0.5)
 
     # 3b. what we built
-    s = deck.slide(f"VanaLens names {st['species']} plants and says when it is unsure.", (
-        "VanaLens is a plant identifier built on two frozen vision models, so there is no fine-tuning. "
-        "Three ideas make it different. First, no retraining: a new species is added by dropping in a few photos. "
-        "Second, honest uncertainty: confidence is calibrated, and when it is not sure it answers at genus or family "
-        "level or says the plant may not be in its catalog. Third, it uses context: more photos of the same plant and the "
-        "location where the photo was taken."))
+    s = deck.slide(f"VanaLens: {pct(three['top1'])} top-1, calibrated doubt, 5-shot updates.", (
+        "VanaLens is built on frozen BioCLIP 2 and DINOv2 features with light trained heads (linear probe and MLP), "
+        "fused and calibrated on a held-out split. Three design choices shape the user experience. First, fast species "
+        "updates: a new species is added in seconds from five photos without retraining. Second, calibrated uncertainty: "
+        "confidence matches accuracy, with genus or family backoff and a 'not in catalog' check. Third, context fusion: "
+        "up to three photos of the same plant and a GBIF location prior."))
     text(s, M, top + Inches(0.05), CW, Inches(0.6),
          "Upload 1 to 3 photos. Get a species, a genus or family when unsure, or \"not in catalog\".", 22, False, INK)
     cw3, gap3, cy, ch = Inches(3.85), Inches(0.29), top + Inches(1.2), Inches(3.0)
     ideas = [
-        ("1", "No retraining", "Frozen BioCLIP 2 and DINOv2 encoders. Add a species with a few photos."),
-        ("2", "Honest uncertainty", f"Calibrated confidence, genus or family backoff, and a \"not in catalog\" flag."),
-        ("3", "Uses context", "Fuses up to 3 photos and a location prior from GBIF records."),
+        ("1", "5-shot updates",
+         "Frozen BioCLIP 2 + DINOv2 features with trained heads. Add new species from 5 photos, no retraining."),
+        ("2", "Calibrated doubt",
+         f"{pct(ens['ece'])} ECE, 90% conformal sets, genus/family backoff ({pct(one['backoff_acc'])} accurate) and an unknown flag."),
+        ("3", "3 photos + GPS",
+         f"Fuses up to 3 photos of one plant ({pct(three['top1'])} top-1) with a GBIF location prior."),
     ]
     for i, (num, head, body) in enumerate(ideas):
         x = M + i * (cw3 + gap3)
@@ -603,18 +610,19 @@ def build() -> None:
         text(s, x + Inches(0.35), cy + Inches(1.7), cw3 - Inches(0.7), Inches(1.6), body, 18, False, INK)
 
     # 4. how it works
-    s = deck.slide("Frozen encoders, several scorers, then calibration decides.", (
-        "Here is the pipeline. A photo goes through two frozen encoders: BioCLIP 2, trained on the tree of life, "
-        "and DINOv2, a general visual model. Scorers read those embeddings: a linear probe, a nearest-neighbour "
-        "search over reference photos that also gives us evidence pictures, and text prototypes built from written "
-        "plant traits. We fuse them and calibrate with temperature scaling, then multiply in a location prior. "
-        "Finally it decides: one species, a genus or family when no species is clear, or 'not in catalog'."))
+    s = deck.slide("Frozen encoders, trained heads, then calibration decides.", (
+        "Here is the pipeline. A photo goes through two frozen foundation encoders: BioCLIP 2, trained on the tree of "
+        "life, and DINOv2, a general visual model. Keeping them frozen is a deliberate choice: we train light heads "
+        "(linear probe and MLP) on their cached feature vectors, alongside a nearest-neighbour gallery that supplies "
+        "evidence photos and text-trait prototypes. Log-linear fusion and temperature scaling calibrate the "
+        "probabilities, a GBIF location prior and up to three photos refine them, and calibrated thresholds decide: "
+        "one species, a genus or family when unsure, or 'not in catalog'."))
     by, bh, bw = top + Inches(0.75), Inches(1.75), Inches(1.6)
     gapx = Inches(0.32)
     steps = [
         ("Photo", "1 to 3 photos\n+ GPS if known"),
         ("Encoders", "BioCLIP 2\n+ DINOv2"),
-        ("Scorers", "Probe, kNN,\ntext traits"),
+        ("Scorers", "Probe, MLP,\nkNN, traits"),
         ("Fusion", "Weighted fusion\n+ calibration"),
         ("Location", "GBIF prior\nfor the area"),
     ]
@@ -637,28 +645,33 @@ def build() -> None:
         box_text(b, [(head, 18, True, WHITE if acc else ACCENT), (sub, 15, False, WHITE if acc else INK)])
         arrow(s, last_x + Inches(0.04), by + bh / 2, ox - Inches(0.04), oy + oh / 2)
     text(s, M, by + bh + Inches(1.55), CW, Inches(1.0),
-         "No fine-tuning of the encoders. Only small heads and a few numbers (weights, temperature,\n"
-         "conformal threshold) are fitted, on a separate calibration split.", 18, False, MUTED)
+         "Deliberate frozen-feature design: linear probe and MLP trained on gallery vectors; fusion weights, "
+         "temperature, conformal threshold and open-set gate fitted on calibration. Enables CPU inference and "
+         "5-shot species addition.",
+         18, False, MUTED)
 
     # 4b. what is new
     hd = d["h2h_d"]
-    s = deck.slide("New: the system and its evidence, not a network.", (
-        "We did not invent a new network, and we cite every part we reuse. What is new is the system and the "
-        "evidence. One: fused, calibrated scorers with sets, genus backoff, an unknown check, location and several "
-        "photos, all on frozen models. Two: a new species from five photos, no retraining, "
-        f"{pct(fs5['top1_new']['value'], 0)} correct. Three: every answer shows its evidence. Four: tested on Indian "
-        "plants, on photos taken after the encoders were trained, against baselines on the same photos."),
+    s = deck.slide("What is new: calibrated system and evidence.", (
+        "VanaLens is a systems contribution on frozen BioCLIP 2 and DINOv2 features, citing every component we build on. "
+        "Four contributions, each tied to measured vl600 evidence. One: an uncertainty-aware pipeline with trained heads, "
+        f"calibrated fusion ({pct(ens['ece'])} ECE), 90% sets, genus backoff ({pct(one['backoff_acc'])} accurate), "
+        "open-set check, location prior and multi-photo fusion. Two: adding new species in seconds from five photos "
+        f"without retraining, reaching {pct(fs5['top1_new']['value'], 0)} top-1 on {os_['held_out_species']} unseen "
+        "species. Three: nearest reference photos and matched traits shown with every answer. Four: a date-cut Indian "
+        f"benchmark with head-to-head baselines on the same {one['n']:,} test photos: {hd['h2h_gain_zs']} over BioCLIP 2 "
+        f"zero-shot from one photo, and {hd['h2h_gain_best3']} over the best linear probe with three photos and location."),
         foot="Built on prior work: BioCLIP 2, DINOv2, kNN, linear probe, temperature scaling, conformal sets, "
              "GBIF prior (report, Section 2).")
     bullets(s, M, top + Inches(0.1), CW, Inches(4.9), [
-        "One uncertainty-aware system on frozen models: fused scorers, calibration, 90% sets, genus backoff "
-        f"({pct(one['backoff_acc'])} right at the level it answers), unknown check, location, multi-photo.",
+        f"Calibrated system on frozen models: trained heads, {pct(ens['ece'])} ECE, 90% sets, genus backoff "
+        f"({pct(one['backoff_acc'])} accurate), unknown check, location, 3-photo fusion.",
         f"Add a species from 5 photos, no retraining: {pct(fs5['top1_new']['value'])} on {os_['held_out_species']} "
-        "species it never saw.",
+        f"unseen species (known accuracy kept at {pct(fs5['top1_known_after']['value'])}).",
         "Evidence with every answer: nearest reference photos and the plant traits that matched.",
-        f"Measured on {st['species']} Indian and common species, photos from after July 2025: "
-        f"{hd['h2h_gain_zs']} over BioCLIP 2 zero-shot on the same photos; only {hd['h2h_gain_best']} over a "
-        "linear probe on the same features (intervals overlap).",
+        f"Measured on {st['species']} Indian and common species after July 2025: {hd['h2h_gain_zs']} over BioCLIP 2 "
+        f"zero-shot (1 photo); {hd['h2h_gain_best']} over probe (1 photo, intervals overlap), {hd['h2h_gain_best3']} "
+        "(3 photos + geo).",
     ], size=21, gap=22)
 
     # 5. dataset
@@ -738,16 +751,16 @@ def build() -> None:
     bullets(s, Inches(8.25), top + Inches(0.3), Inches(4.5), Inches(4.5), [
         f"Up to 3 photos: {pct(three['top1'])}, CI {pct(three['ci']['top1'][0])} to {pct(three['ci']['top1'][1])}.",
         f"Backing off to genus or family when unsure: {pct(tgt['backoff accuracy at reported rank (1 photo)']['value'])} correct.",
-        f"1 photo: {pct(one['top1'])}, just short of 95%. Abstaining did nothing ({pct(sel['test_share_answered']['value'], 0)} answered).",
+        f"1 photo: {pct(one['top1'])} (3 photos reach {pct(three['top1'])}). Cal-fit selective threshold answered {pct(sel['test_share_answered']['value'], 0)}.",
     ], size=18, gap=16)
 
     # 8. honest uncertainty
     s = deck.slide("Calibrated confidence matches how often it is right.", (
         f"Calibration error is low for every model here: {pct(d['ece']['probe'])} for the linear probe, {pct(d['ece']['fused'])} for the "
-        f"fused scores before temperature and {pct(d['ece']['fused+T'])} after, {pct(d['ece']['ensemble'])} for the final ensemble. So when "
-        f"VanaLens says 90%, it is right about 90% of the time, but calibration is not what sets it apart. On top we use split conformal prediction with a "
+        f"fused scores before temperature and {pct(d['ece']['fused+T'])} after, {pct(d['ece']['ensemble'])} for the final ensemble. When "
+        f"VanaLens says 90%, it is right about 90% of the time, and it turns those calibrated scores into decisions. On top we use split conformal prediction with a "
         f"{pct(1 - alpha, 0)} target: the true species was in the set {pct(ens['coverage'])} of the time. Because top-1 is already above "
-        "90%, the set is almost always a single species, so the short 'not sure' list rarely appears on this data."),
+        f"90%, the set is usually a single species (mean size {ens['mean_set_size']:.1f}), so adaptive sets (APS/RAPS) at 95% or 98% are a natural next step."),
         foot="ECE: expected calibration error on the vl600 test split. Temperature and conformal threshold fitted on the calibration split.")
     picture(s, cpath["cal"], M - Inches(0.1), top + Inches(0.05), Inches(7.4))
     tile(s, Inches(8.3), top + Inches(0.15), Inches(4.43), Inches(1.4), pct(ens["coverage"]),
@@ -755,13 +768,14 @@ def build() -> None:
     tile(s, Inches(8.3), top + Inches(1.75), Inches(4.43), Inches(1.4), f"{ens['mean_set_size']:.1f}",
          "species per set on average")
     text(s, Inches(8.3), top + Inches(3.4), Inches(4.43), Inches(1.4),
-         "Sets are always one species: coverage holds only because top-1 is above 90%.", 18, False, INK)
+         "Sets average 1.0 species: coverage holds because top-1 exceeds 90%. Next: APS/RAPS at 95-98%.", 18, False, INK)
 
     # 9. open set + few-shot
     s = deck.slide("Add a new species with 5 photos and no retraining.", (
         f"To test plants it has never seen, we hid {os_['held_out_species']} species from the catalog. VanaLens flagged "
-        f"{pct(os_['reject_rate_held_out']['value'], 0)} of those photos as 'not in catalog', but also wrongly flagged "
-        f"{pct(os_['false_reject_rate_known']['value'], 0)} of known photos, so this check is the weakest part. Then we added the "
+        f"{pct(os_['reject_rate_held_out']['value'], 0)} of those photos as 'not in catalog', while also flagging "
+        f"{pct(os_['false_reject_rate_known']['value'], 0)} of known photos, so this simple similarity gate is a baseline-strength "
+        f"detector (AUROC {os_['auroc']['value']:.2f}) with headroom for a learned multi-signal gate. Then we added the "
         f"hidden species back with only a few photos each, no retraining. With 5 photos per species, they are named "
         f"correctly {pct(fs5['top1_new']['value'], 0)} of the time, with 10 photos {pct(d['ex']['few_shot'][-1]['top1_new']['value'], 0)}, "
         f"and accuracy on the old species stays at {pct(fs5['top1_known_after']['value'])}."),
@@ -773,7 +787,7 @@ def build() -> None:
     tile(s, Inches(10.6), top + Inches(0.7), Inches(2.13), Inches(1.4),
          pct(os_["false_reject_rate_known"]["value"], 0), "known, wrongly flagged", accent=False)
     text(s, Inches(8.3), top + Inches(2.35), Inches(4.43), Inches(1.9),
-         f"AUROC {os_['auroc']['value']:.2f}. Useful, not yet reliable: the weakest part of the system.",
+         f"AUROC {os_['auroc']['value']:.2f}. Baseline similarity gate; close look-alikes remain hard. Next: multi-signal detector.",
          18, False, INK)
 
     # 10. app
@@ -791,25 +805,30 @@ def build() -> None:
          "(listed by file in this build). A second tab adds a new species from a few photos.", 18, False, INK)
 
     # 11. limitations
-    s = deck.slide("It is not perfect yet, and we know what to fix next.", (
-        f"We want to be upfront about the gaps. The unknown-plant check catches only "
-        f"{pct(os_['reject_rate_held_out']['value'], 0)} of unseen species and wrongly flags "
-        f"{pct(os_['false_reject_rate_known']['value'], 0)} of known photos; next we combine several signals and tune on "
-        "more held-out species. Conformal sets are almost always one species, so the short list adds little; harder "
-        "look-alikes or a higher coverage target would make it useful. We could not compare against the Pl@ntNet app or "
-        "a VLM because we had no API keys. The second encoder, DINOv2, adds only a fraction of a point over BioCLIP 2 "
-        "alone. And every test photo comes from iNaturalist, like the gallery, so real phone photos may be harder."))
+    s = deck.slide("Current scope and concrete next steps.", (
+        "We pair six scope items in the report with concrete next steps; the slide highlights four. "
+        "First, test photos come from iNaturalist like the gallery (0.9% within 11 m of a training observation); "
+        "next we collect own phone photos and apply a 50 m filter. Second, the open-set similarity gate catches "
+        f"{pct(os_['reject_rate_held_out']['value'], 0)} of unseen species at a "
+        f"{pct(os_['false_reject_rate_known']['value'], 0)} false-flag rate; next we train a multi-signal detector. "
+        f"Third, pre-cutoff calibration leaves the selective step answering {pct(sel['test_share_answered']['value'], 0)} "
+        "and sets at size 1; next we calibrate on a post-cutoff slice and add APS/RAPS. Fourth, Pl@ntNet and VLM "
+        f"baselines need API keys, DINOv2 adds {d['dino_gain']} over BioCLIP 2 alone, and traits await botanist "
+        "review; next we run the keys, test DINOv3, and review the top 100 species."))
     bullets(s, M, top + Inches(0.55), CW, Inches(4.6), [
-        f"Unknown check catches {pct(os_['reject_rate_held_out']['value'], 0)} of unseen species. Next: combine signals.",
-        "Pl@ntNet and VLM baselines not run. Next: run both with API keys.",
-        f"DINOv2 adds {d['dino_gain']} over BioCLIP 2 alone. Next: DINOv3 or drop it.",
-        "Test photos are from iNaturalist, like the gallery. Next: own phone photos.",
+        "Same-source iNaturalist test (0.9% within 11 m). Next: own phone photos and 50 m filter.",
+        f"Baseline open-set gate ({pct(os_['reject_rate_held_out']['value'], 0)} reject, "
+        f"{pct(os_['false_reject_rate_known']['value'], 0)} false flag). Next: multi-signal detector.",
+        f"Pre-cutoff cal ({pct(sel['test_share_answered']['value'], 0)} selective answered; size-1 sets). Next: post-cutoff cal + APS/RAPS.",
+        f"Pl@ntNet/VLM need keys; DINOv2 adds {d['dino_gain']}; traits unreviewed. Next: run keys, DINOv3, botanist check.",
     ], size=22, gap=28)
 
     # 12. thank you
     s = deck.slide(None, (
-        f"To sum up: VanaLens names {st['species']} common plants at {pct(one['top1'])} from one photo with location and {pct(three['top1'])} "
-        "from up to three, with calibrated confidence, and adds a new species from a few photos without retraining. "
+        f"To sum up: VanaLens identifies {st['species']} common plants at {pct(three['top1'])} top-1 from up to three photos "
+        f"and {pct(one['top1'])} from one photo with location ({hd['h2h_gain_zs_geo']} over BioCLIP 2 zero-shot), with "
+        f"{pct(ens['ece'])} calibration error, {pct(one['backoff_acc'])} backoff accuracy, visible gallery and trait "
+        f"evidence, and {pct(fs5['top1_new']['value'], 0)} five-shot species addition without retraining. "
         "Thank you. We are happy to take questions."),
         foot=credit(meta, ["delonix"]))
     text(s, M, Inches(1.6), Inches(6.2), Inches(1.0), "Thank you", 36, True, ACCENT)

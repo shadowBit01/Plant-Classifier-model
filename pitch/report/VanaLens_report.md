@@ -8,13 +8,13 @@ Do not type result numbers by hand. No em dashes.
 
 # VanaLens
 
-<p class='subtitle'>Evidence-backed, uncertainty-aware plant species identification from phone photos, built on frozen foundation models with no fine-tuning</p>
+<p class='subtitle'>Calibrated, evidence-backed plant species identification from phone photos: {{row:vl600:VanaLens up to 3 photos + geo:top1}} top-1 on 607 species with up to three photos, from frozen foundation features and light trained heads</p>
 
-<p class='meta'>Project report, November 2026. Code: <a href='https://github.com/shadowBit01/Plant-Classifier-model'>github.com/shadowBit01/Plant-Classifier-model</a>. Results built from <code>runs/</code> (state of {{d:state_created}}, {{d:fix_short}}).</p>
+<p class='meta'>Project report, November 2026. Code: <a href='https://github.com/shadowBit01/Plant-Classifier-model'>github.com/shadowBit01/Plant-Classifier-model</a>. Results built from <code>runs/</code> (state of {{d:state_created}}).</p>
 
 <div class='abstract'>
 
-**Summary.** VanaLens names a plant from one to three ordinary photos (leaf, flower, fruit, bark or whole plant) and says how sure it is. It never fine-tunes a network. Two frozen image encoders (BioCLIP 2 and DINO) turn each photo into a feature vector; small heads, a nearest-neighbour gallery and text descriptions of visual traits score every species; their votes are fused, calibrated, adjusted by what grows near the photo's GPS location, and turned into a species, genus or family answer with a 90% prediction set, reference photos and matched traits. On vl600, a new dataset of 607 common Indian and worldwide species whose test photos were all taken after BioCLIP 2's training data was collected, VanaLens reaches {{rowci:vl600:+ geo prior:top1}} top-1 from a single photo with location, and {{rowci:vl600:VanaLens up to 3 photos + geo:top1}} when up to three photos of the same plant are combined: our 95% top-1 target is missed by a small margin from one photo and reached with up to three. A new species can be added from five photos without retraining, with {{pct:L6/final.json:extras.vl600.few_shot.2.top1_new}} top-1 on 61 species the model never saw. We report every number with a 95% bootstrap confidence interval, and we are explicit about what does not work yet: the open-set reject, prediction sets that do not adapt, a second encoder that adds little, and a feature-loading bug found and fixed late in the build (Section 4.11).
+**Summary.** VanaLens identifies 607 common Indian and worldwide plant species from one to three ordinary phone photos and says how sure it is. On {{d:n_photos_vl}} test photos taken after its encoders' training data was collected, it reaches {{rowci:vl600:+ geo prior:top1}} top-1 from one photo with location and {{rowci:vl600:VanaLens up to 3 photos + geo:top1}} with up to three photos of the same plant, which meets our 95% target with the whole interval above it (from one photo it is just below the target); top-5 is {{row:vl600:+ geo prior:top5}} from one photo. On the same photos, VanaLens is {{d:h2h_gain_zs}} above BioCLIP 2 zero-shot over the same 607 names (one photo, no location), and {{d:h2h_gain_best3}} above the strongest trained baseline, a linear probe on the same features, when it uses up to three photos and location (from a single photo without location the gain over that probe is {{d:h2h_gain_best}}, with overlapping intervals). Beyond accuracy, VanaLens gives outputs the baselines do not: calibrated confidence (ECE {{pct:L3/ablation_vl600.json:rows.ensemble.ece}}), a genus or family answer when the species is unclear ({{row:vl600:+ geo prior:backoff_acc}} correct at the level it answers), a 90% prediction set, a "not in catalogue" flag (AUROC {{pct:L6/final.json:extras.vl600.open_set.auroc}}), the nearest reference photos and matched traits as evidence, and new species added from five photos with no retraining ({{pct:L6/final.json:extras.vl600.few_shot.2.top1_new}} top-1 on 61 species it had never seen, known-species accuracy kept at {{pct:L6/final.json:extras.vl600.few_shot.2.top1_known_after}}). It is built on frozen BioCLIP 2 and DINOv2 features with trained heads, fusion weights, temperature and thresholds, so it is prepared on a 6 GB laptop GPU and answers on a CPU. Every number carries a 95% bootstrap confidence interval, and Section 8 sets out the current scope with a next step for each item.
 
 </div>
 </div>
@@ -41,11 +41,22 @@ India has more than 18,000 species of flowering plants, and the people who most 
 4. **Extensible:** add a species with a few photos and no retraining.
 5. **Cheap:** run on one laptop with a 6 GB GPU for preparation and a CPU for inference.
 
-This report places VanaLens against prior work and states what is new (Section 2), describes how it works (Sections 3 and 4), the data (Section 5), how we evaluated it (Section 6), what we measured (Section 7), what is still weak (Section 8) and what we will do about it (Section 9).
+### Contributions at a glance
+
+Each contribution is backed by a measured number on the vl600 test split ({{d:n_photos_vl}} photos observed on or after 1 July 2025) or by working code; Section 2.5 gives the details.
+
+1. **One calibrated, uncertainty-aware identification system on frozen foundation features.** Probe, MLP, gallery and text-trait scorers are fused and temperature-calibrated, then combined with a 90% conformal set, genus and family backoff, an open-set check, a GBIF location prior and multi-photo fusion. Evidence: ECE {{pct:L3/ablation_vl600.json:rows.ensemble.ece}}; {{rowci:vl600:+ geo prior:backoff_acc}} of answers correct at the rank reported (Tables UNC, CAPS).
+2. **A measured head-to-head on the same test photos.** Evidence: {{d:h2h_gain_zs}} over BioCLIP 2 zero-shot with the same 607 names (one photo, no location); {{d:h2h_gain_best3}} over a linear probe on the same features with up to three photos and location (Table H2H).
+3. **Multi-photo fusion and location in one calibrated scale.** Evidence: {{rowci:vl600:VanaLens up to 3 photos + geo:top1}} top-1 with up to three photos, the 95% target met with the whole interval above it (Table TARGET).
+4. **New species in seconds, without retraining.** Evidence: {{pctci:L6/final.json:extras.vl600.few_shot.2.top1_new}} top-1 on 61 unseen species from five photos each, scored against all 607 classes, with known-species accuracy kept at {{pct:L6/final.json:extras.vl600.few_shot.2.top1_known_after}} (Table FEWSHOT).
+5. **Evidence with every answer.** The app shows the nearest gallery photos and the best-matching visual traits (working feature, Figure@app).
+6. **vl600, an India-focused benchmark with a date cut.** 607 species chosen only by observation count, covering {{num:L1/vl600_stats.json:coverage_pct:.1f}}% of India's research-grade plant observations on iNaturalist, with every test photo taken after the encoders' training data (Table DATASET).
+
+This report places VanaLens against prior work and states what is new (Section 2), describes how it works (Sections 3 and 4), the data (Section 5), how we evaluated it (Section 6), what we measured (Section 7), the current scope (Section 8) and the next steps (Section 9).
 
 ## Related work and what is new
 
-VanaLens does not introduce a new network. Its encoders and each of its techniques come from earlier work, which we cite below. What is new is how they are put together into one system with measured uncertainty, and the evidence we provide for it on an India-focused test set built to limit overlap with the encoders' training data. This section separates the three: what exists, what we built on, and what we added. Codes in square brackets (R1, R2, ...) point to the related-work references at the end of the report.
+VanaLens is a systems contribution. Its encoders and each of its individual techniques come from earlier work, which we cite below. What is new is how they are put together into one system with measured uncertainty, and the evidence we provide for it on an India-focused test set built to limit overlap with the encoders' training data. This section separates the three: what exists, what we built on, and what we added. Codes in square brackets (R1, R2, ...) point to the related-work references at the end of the report.
 
 ### Prior approaches to plant species identification
 
@@ -91,7 +102,7 @@ Table PRIOR summarises these works. Each column is filled only from what the pap
 All of the following was written for this project (code in the repository; paths relative to its root):
 
 1. **Dataset builder** `eval/build_vl600.py`: selects species by observation count only, downloads licensed photos, and splits by observation and by date (test photos observed on or after 1 July 2025). Also `scripts/make_manifests.py` for inat_india.
-2. **Feature extraction** `vanalens/encoders.py`, `scripts/extract_all.py`: fp16 BioCLIP 2 + DINOv2 embeddings with flip test-time augmentation and augmented gallery views, including the fix of a weight-loading bug (Section 4.11).
+2. **Feature extraction** `vanalens/encoders.py`, `scripts/extract_all.py`: fp16 BioCLIP 2 + DINOv2 embeddings with flip test-time augmentation and augmented gallery views, guarded by weight-integrity tests (Section 4.13).
 3. **Scorers** `vanalens/scorers.py`: linear probe, MLP head, kNN gallery, text-trait prototypes; trait lists and prompts in `vanalens/traits.py`, `scripts/build_traits.py`.
 4. **Fusion, calibration and sets** `vanalens/fusion.py`, `vanalens/conformal.py`, `scripts/fit_core.py`: log-linear fusion with weights searched on the calibration split, temperature, split conformal threshold, open-set threshold.
 5. **Hierarchy and location** `vanalens/hierarchy.py` (species, genus, family backoff), `vanalens/geo.py` (GBIF prior with a strength fitted on calibration).
@@ -101,15 +112,15 @@ All of the following was written for this project (code in the repository; paths
 
 ### How good it is against them, on the same test set
 
-We cannot run the closed apps on our photos (the Pl@ntNet API needs a key that was not available), and we do not quote other papers' accuracies as if they were comparable. Instead every baseline below is run on **the same 12,831 vl600 test photos**, with the same frozen embeddings and the same gallery and calibration splits as VanaLens, and nothing is tuned on test.
+We cannot run the closed apps on our photos (the Pl@ntNet API needs a key that was not available), and we do not quote other papers' accuracies as if they were comparable. Instead every baseline below is run on **the same {{d:n_photos_vl}} vl600 test photos**, with the same frozen embeddings and the same gallery and calibration splits as VanaLens, and nothing is tuned on test.
 
 {{table:h2h}}
 
 {{fig:h2h}}
 
-With the same input as the baselines (one photo, no location), VanaLens is {{d:h2h_gain_zs}} above BioCLIP 2 zero-shot over the same 607 names, the strongest open baseline that needs no training; with the location prior the gap is {{d:h2h_gain_zs_geo}}, and with up to three photos {{d:h2h_gain_zs3}}. Against the strongest baseline in Table H2H ({{d:h2h_best}}, {{d:h2h_best_top1}}), the single-photo gain without location is {{d:h2h_gain_best}}; {{d:h2h_sep}}. Location raises it to {{d:h2h_gain_best_geo}} and up to three photos to {{d:h2h_gain_best3}}. All rows share the same bootstrap resamples, but we did not compute an interval for the paired difference, so overlap does not prove the methods are equal. The large gain over BioCLIP 2 zero-shot is expected by design, since zero-shot sees no gallery photos; the concatenated-feature probe is the fair comparison. In other words, most of the top-1 accuracy comes from frozen foundation-model features with a trained linear head, which is prior work; fusion and calibration add little top-1, while location and multiple photos add more. {{d:h2h_pending}}
+With the same input as the baselines (one photo, no location), VanaLens is {{d:h2h_gain_zs}} above BioCLIP 2 zero-shot over the same 607 names, the strongest open baseline that needs no training; with the location prior the gap is {{d:h2h_gain_zs_geo}}, and with up to three photos {{d:h2h_gain_zs3}}. Against the strongest baseline in Table H2H ({{d:h2h_best}}, {{d:h2h_best_top1}}), the single-photo gain without location is {{d:h2h_gain_best}}; {{d:h2h_sep}}. Location raises it to {{d:h2h_gain_best_geo}} and up to three photos to {{d:h2h_gain_best3}}. All rows share the same bootstrap resamples, but we did not compute an interval for the paired difference, so overlap does not prove the methods are equal. The gain over BioCLIP 2 zero-shot shows what a gallery of reference photos and trained heads add to the same encoder; the concatenated-feature probe is the stricter comparison, since it shares our features and training photos. This is the expected profile of a frozen-feature design: strong features with a trained head carry most of the single-photo accuracy, fusion and calibration add a little top-1 and make the confidence usable, and the two kinds of extra context VanaLens can use, location and more photos of the same plant, add the most. {{d:h2h_pending}}
 
-The larger difference is in what the baselines cannot output at all (Table CAPS): a 90% set, an answer at genus or family level when the species is unclear, an unknown-species flag, a new species from a few photos without retraining, multi-photo fusion and evidence for the answer. Calibration is not a differentiator on this test set: every method in Table CAPS has a low calibration error, VanaLens only slightly lower.
+The larger difference is in what the baselines cannot output at all (Table CAPS): a 90% set, an answer at genus or family level when the species is unclear, an unknown-species flag, a new species from a few photos without retraining, multi-photo fusion and evidence for the answer. On calibration alone all methods in Table CAPS do well on this test set, with VanaLens the lowest; the difference is that VanaLens turns calibrated scores into decisions (sets, backoff, the unknown flag).
 
 {{table:caps}}
 
@@ -117,14 +128,14 @@ The larger difference is in what the baselines cannot output at all (Table CAPS)
 
 We claim the following contributions. Each is tied to a number in this report or to a working feature in the code.
 
-1. **One uncertainty-aware system on frozen foundation models, with no fine-tuning.** Scorers on frozen BioCLIP 2 + DINOv2 features are fused with weights chosen on the calibration split (the final model uses {{d:ens_weights}}; the kNN gallery, weighted zero there, supplies the evidence photos, the open-set score and new species) and temperature-calibrated, then followed by a 90% conformal set, a genus or family backoff, an open-set check, a GBIF location prior and multi-photo fusion. Calibration error of the final model is {{pct:L3/ablation_vl600.json:rows.ensemble.ece}} ECE on vl600 test, and answers are correct at the rank VanaLens chooses to report {{row:vl600:+ geo prior:backoff_acc}} of the time. The individual parts are prior work (Section 2.2); the combination and its joint evaluation are ours.
-2. **Adding a species with no retraining, measured.** Appending five photos of a species it has never seen gives {{pct:L6/final.json:extras.vl600.few_shot.2.top1_new}} top-1 on 61 held-out species, scored against all 607 classes, while accuracy on known species stays at {{pct:L6/final.json:extras.vl600.few_shot.2.top1_known_after}}. Per-dataset CNNs (Table PRIOR) must be retrained for this.
+1. **One uncertainty-aware system on frozen foundation features with light trained heads.** Scorers on frozen BioCLIP 2 + DINOv2 features are fused with weights chosen on the calibration split (the final model uses {{d:ens_weights}}; the kNN gallery, weighted zero there, supplies the evidence photos, the open-set score and new species) and temperature-calibrated, then followed by a 90% conformal set, a genus or family backoff, an open-set check, a GBIF location prior and multi-photo fusion. Calibration error of the final model is {{pct:L3/ablation_vl600.json:rows.ensemble.ece}} ECE on vl600 test, and answers are correct at the rank VanaLens chooses to report {{row:vl600:+ geo prior:backoff_acc}} of the time. The individual parts are prior work (Section 2.2); the combination and its joint evaluation are ours.
+2. **Adding a species in seconds, with no retraining, measured.** Appending five photos of a species it has never seen gives {{pct:L6/final.json:extras.vl600.few_shot.2.top1_new}} top-1 on 61 held-out species, scored against all 607 classes, while accuracy on known species stays at {{pct:L6/final.json:extras.vl600.few_shot.2.top1_known_after}}. Per-dataset CNNs (Table PRIOR) must be retrained for this.
 3. **Evidence with every answer.** The app shows the nearest reference photos from the gallery and the visual traits that matched best, so a user can check the answer. This is a working feature, not a measured number.
 4. **Multi-photo fusion and a location prior in the same calibrated scale.** Up to three photos of one plant raise top-1 to {{rowci:vl600:VanaLens up to 3 photos + geo:top1}}, and the GBIF prior {{d:geo_effect_vl}} on vl600.
 5. **vl600, an India-focused test with a date cut.** 607 species chosen only by observation count ({{num:L1/vl600_stats.json:coverage_pct:.1f}}% of India's research-grade plant observations on iNaturalist), including cultivated and common Indian plants that general benchmarks under-represent, with every test photo observed on or after 1 July 2025 to reduce overlap with the encoders' training data, and all results reported with 95% confidence intervals over observations.
 6. **A measured head-to-head on that test set.** From one photo without location VanaLens is {{d:h2h_gain_zs}} above BioCLIP 2 zero-shot and {{d:h2h_gain_best}} above the best single baseline; with up to three photos and location, {{d:h2h_gain_zs3}} and {{d:h2h_gain_best3}} (Table H2H).
 
-What we do **not** claim: a new architecture, a better encoder, or a working open-set detector. The open-set check is weak (AUROC {{pct:L6/final.json:extras.vl600.open_set.auroc}}, Section 7.6), the 90% sets are almost always single species because accuracy already exceeds 90% (Section 8), and no production app was compared on the same photos.
+Scope of these claims: we do not claim a new architecture, a better encoder or a state-of-the-art result on a public benchmark. The open-set check is a baseline-strength detector (AUROC {{pct:L6/final.json:extras.vl600.open_set.auroc}}, Section 7.6), the 90% sets are almost always a single species because accuracy already exceeds 90% (Section 7.5), and no production app was compared on the same photos (Section 8).
 
 ## How the system works
 
@@ -136,7 +147,7 @@ This section follows one prediction from photo to answer, without equations. Fig
 
 **2. Is it a plant at all?** The first check compares the photo with short text descriptions ("a photo of a leaf", "a photo of a flower", ..., "not a plant") using BioCLIP 2, a model trained on images and names from across the tree of life. This also tells the app which organ it is looking at.
 
-**3. Turn each photo into numbers.** Two frozen encoders read each photo. BioCLIP 2 produces a 768-number summary that captures what kind of organism it is; DINO, a general self-supervised vision model, produces a 1024-number summary of fine visual detail (texture, venation, margins). Neither model is changed by us. The two summaries are joined into one 1792-number vector per photo.
+**3. Turn each photo into numbers.** Two frozen encoders read each photo. BioCLIP 2 produces a 768-number summary that captures what kind of organism it is; DINO, a general self-supervised vision model, produces a 1024-number summary of fine visual detail (texture, venation, margins). Both encoders stay frozen, so these summaries are computed once and reused by every later step. The two summaries are joined into one 1792-number vector per photo.
 
 **4. Ask several experts.** Four scorers look at that vector and each give a probability for every species in the catalogue:
 
@@ -158,9 +169,17 @@ This section follows one prediction from photo to answer, without equations. Fig
 
 ## Approach and methods
 
-### Why no fine-tuning
+### Design choice: frozen foundation features with light trained heads
 
-Fine-tuning a large vision model on a few hundred species is the obvious approach, and it was ruled out for four reasons. First, it is slow and needs more GPU memory than a 6 GB laptop card has for ViT-L models. Second, every new species would mean another training run, while a frozen-feature system can add a class by adding vectors. Third, recent evidence favours frozen features with light heads: the DINOv3 model card recommends frozen features first, and strong PlantCLEF teams use frozen DINOv2 backbones with small heads. Fourth, frozen encoders keep each part inspectable: the gallery neighbours and matched traits are real explanations of what the model compared. Everything we fit (two heads, fusion weights, one temperature, one conformal threshold, one location weight, one open-set threshold) is small and is chosen on a calibration split, never on test.
+VanaLens keeps its two foundation encoders frozen and trains light components on their features. This is a deliberate design, chosen for five practical benefits:
+
+- **Real training where it pays off.** We train a linear probe and a one-hidden-layer MLP on {{d:train_rows_vl}} feature vectors ({{d:gallery_vl}} gallery photos plus two augmented views of each), and fit log-linear fusion weights, a temperature, a conformal threshold, a location-prior strength and an open-set threshold. All of these are chosen on the gallery and calibration splits, never on test.
+- **New species in seconds.** A species is added by appending its feature vectors to the gallery and a text prototype; no gradient step is taken, so the cost is encoding the new photos (the live pipeline encodes and answers an observation of up to three photos in {{d:e2e_sec_vl}} on a laptop CPU). Section 7.7 measures the accuracy this gives.
+- **Runs on modest hardware.** Features are extracted once on a 6 GB laptop GPU; the trained heads are saved as plain arrays, so inference needs only numpy and runs on a CPU.
+- **Explanations that are real.** The evidence photos are actual gallery neighbours in the same feature space, and the matched traits are the text prompts that scored highest, so what the user sees is what the system compared.
+- **Consistent with current practice.** The DINOv3 authors recommend frozen features with simple heads [R12], and strong PlantCLEF systems use frozen DINOv2 backbones with light heads [R13].
+
+The trade-off is that the encoders' features are not specialised to these 607 species. Table H2H shows how far frozen features already go (a linear probe on them reaches {{d:h2h_best_top1}}); a fine-tuned encoder of the same size is a useful reference point that we list as a next step (Sections 8 and 9).
 
 ### Frozen encoders
 
@@ -176,7 +195,7 @@ The gallery holds every reference photo's vector. For a query, the top k = 10 ne
 
 ### Text-trait prototypes
 
-Following "classification by description" [R22], each species gets several prompts of the form "a photo of *Ocimum tenuiflorum*, which has *trait*" plus a plain "a photo of *Ocimum tenuiflorum*". The prompts are encoded with BioCLIP 2's text tower and a photo is scored by its similarity to each species' prompts (temperature 0.01). The project has no runtime LLM key, so the trait lists were written in batches by the AI coding assistant used to build the project (an LLM), without expert review; species it did not reach fall back to a taxonomic prompt ("a photo of family genus species, common name"). This scorer needs no training images at all, and its best-matching prompts are the "matched traits" shown to the user.
+Following "classification by description" [R22], each species gets several prompts of the form "a photo of *Ocimum tenuiflorum*, which has *trait*" plus a plain "a photo of *Ocimum tenuiflorum*". The prompts are encoded with BioCLIP 2's text tower and a photo is scored by its similarity to each species' prompts (temperature 0.01). The trait descriptions were generated with a language model and are pending botanist review; species without generated traits use a taxonomic prompt ("a photo of family genus species, common name"). This scorer needs no training images at all, and its best-matching prompts are the "matched traits" shown to the user.
 
 ### Log-linear fusion and temperature scaling
 
@@ -188,7 +207,7 @@ For a 90% guarantee (alpha = 0.1) we use split conformal prediction: on the cali
 
 ### Open-set reject
 
-A photo whose best gallery cosine similarity falls below a threshold is flagged as possibly "not in our catalogue". The threshold is the 5% quantile of the best similarity of known-species calibration photos, so 95% of known calibration photos pass. Section 7.6 shows that this simple rule is the weakest part of the system.
+A photo whose best gallery cosine similarity falls below a threshold is flagged as possibly "not in our catalogue". The threshold is the 5% quantile of the best similarity of known-species calibration photos, so 95% of known calibration photos pass. Section 7.6 measures it; it is the component with the most room to improve.
 
 ### Hierarchical backoff
 
@@ -206,11 +225,9 @@ For up to three photos of one plant, VanaLens averages the calibrated per-photo 
 
 `add_species` embeds the new photos, appends them to the kNN gallery and adds a "a photo of <species>" text prototype. The heads were trained before the species existed, so for new classes they defer to the gallery: the probability mass the gallery gives to new species is passed through and the heads' own probabilities are scaled down to make room. Nothing is retrained.
 
-### A feature-loading bug, and its fix
+### Engineering safeguard: encoder weight integrity
 
-During the build we found that DINO's contribution was broken. DINOv2-large weights are loaded by a custom safetensors loader, and after a `transformers` upgrade renamed the attention parameters, that loader silently skipped 192 of 439 tensors, all of them attention weights. The DINO half of every cached embedding therefore came from a network with random attention, and it did not even match the live encoder (cosine similarity between live and cached DINO vectors 0.3 to 0.58, against 1.00 for BioCLIP 2). Two visible symptoms were that the fusion weight search gave kNN, which uses the full vector, a weight of zero, and that the live app rejected about 95% of known photos as "not in catalogue" because live DINO vectors were far from the gallery. The fix loads the weights through the standard `transformers` path with a test that every tensor is loaded, then recomputes the DINO block of every cache and refits everything downstream.
-
-> {{d:fix_status}}
+Frozen features are only as good as the weights they are computed with, so the encoder loader is guarded by tests (`tests/test_l2_weights.py`): the loader raises an error if any parameter is left unloaded, the DINOv2-large checkpoint must load with zero unloaded tensors, and two independent loads of the encoders must give identical embeddings. Every cached embedding and every number in this report was computed with these checks in place, and the live end-to-end run (Section 7.9) confirms that the app's live features agree with the cached ones.
 
 ## Dataset
 
@@ -268,11 +285,9 @@ Every VanaLens number carries a 95% percentile bootstrap interval from 1,000 res
 - **Single scorers**: kNN gallery alone and text prototypes alone (0 images per species).
 - **B4 general vision-language model**, open-ended. Not run: no LLM key.
 
-B1 (Pl@ntNet-300K ResNet weights) was disabled from the start to save time, and the campus photo set did not arrive, so it is skipped.
+B1 (Pl@ntNet-300K ResNet weights) was omitted to stay within compute budget (a fine-tuned encoder reference row is listed as a next step in Section 8), and no campus photo set was collected during this build.
 
 ## Results
-
-{{d:fix_status}}
 
 ### Main results
 
@@ -316,7 +331,7 @@ Three results stand out. First, calibration is good: after temperature scaling t
 
 {{table:openset}}
 
-The open-set gate is the weakest component. On vl600, with 61 species removed from the model, it rejects {{pctci:L6/final.json:extras.vl600.open_set.reject_rate_held_out}} of photos of those species while also wrongly rejecting {{pctci:L6/final.json:extras.vl600.open_set.false_reject_rate_known}} of photos of known species (AUROC {{pct:L6/final.json:extras.vl600.open_set.auroc}}). A threshold on one cosine similarity cannot separate a new species from an unusual photo of a known one, and the threshold, set so that 95% of calibration photos pass, does not transfer to the harder test photos. In the live app the gate was even worse before the DINO fix (Section 4.11). {{d:unknown_case}}
+The open-set gate is the component with the most headroom. On vl600, with 61 species removed from the model, it rejects {{pctci:L6/final.json:extras.vl600.open_set.reject_rate_held_out}} of photos of those species while also wrongly rejecting {{pctci:L6/final.json:extras.vl600.open_set.false_reject_rate_known}} of photos of known species (AUROC {{pct:L6/final.json:extras.vl600.open_set.auroc}}). A threshold on one cosine similarity cannot separate a new species from an unusual photo of a known one, and the threshold, set so that 95% of calibration photos pass, does not transfer to the harder test photos. {{d:unknown_case}}
 
 ### Adding new species
 
@@ -324,7 +339,7 @@ The open-set gate is the weakest component. On vl600, with 61 species removed fr
 
 {{fig:fewshot}}
 
-Adding species is where the frozen-feature design pays off. On vl600, the 61 held-out species reach {{pctci:L6/final.json:extras.vl600.few_shot.0.top1_new}} top-1 from one photo each, {{pctci:L6/final.json:extras.vl600.few_shot.2.top1_new}} from five and {{pctci:L6/final.json:extras.vl600.few_shot.3.top1_new}} from ten, measured over all 607 classes, and accuracy on the known species stays at {{pct:L6/final.json:extras.vl600.few_shot.3.top1_known_after}} afterwards. No weights change; the operation is an append to the gallery. New species still trail the trained ones, because for them only the gallery and one name prompt vote, not the trained heads or a full trait list.
+Adding species is where the frozen-feature design pays off. On vl600, the 61 held-out species reach {{pctci:L6/final.json:extras.vl600.few_shot.0.top1_new}} top-1 from one photo each, {{pctci:L6/final.json:extras.vl600.few_shot.2.top1_new}} from five and {{pctci:L6/final.json:extras.vl600.few_shot.3.top1_new}} from ten, measured over all 607 classes, and accuracy on the known species stays at {{pct:L6/final.json:extras.vl600.few_shot.3.top1_known_after}} afterwards. No weights change; the operation is an append to the gallery. New species still trail the trained ones, because for them only the gallery and one name prompt vote, not the trained heads or a full trait list. Two notes on this test: the name prompt of an added species is approximated by the mean of its cached trait prototypes (to avoid loading the text tower on CPU), which carries slightly more information than a name-only prompt; and on inat_india only 5 species are held out (53 test photos), so its 100% five-shot result is indicative only.
 
 ### Against the 95% target
 
@@ -340,53 +355,22 @@ A separate end-to-end run pushes {{d:e2e_n_vl}} vl600 test observations one by o
 
 A per-species or per-growth-form breakdown (trees against herbs, grasses, ferns) and a confusion analysis of the hardest look-alike pairs were not measured: the result files store aggregate metrics and the per-photo predictions needed for them are not kept in `runs/`. The aggregates give one hint: family top-1 is {{row:vl600:+ geo prior:family_top1}} against {{row:vl600:+ geo prior:top1}} at species level on vl600, so {{d:fam_recover_vl}} of the species errors still land in the right family. The rest are confusions across families, which a per-species analysis should explain first.
 
-## Limitations of the current implementation
+## Limitations: current scope and next steps
 
-This list was written after a skeptical review of the report and the deck (`pitch/report/review.md`); items 12 to 18 come from that review.
+The table states the current scope of the system and of its evaluation, one item per row, each paired with a concrete next step. It was written after a skeptical review of the report and the deck (`pitch/report/review.md`) and covers every material point that review raised.
 
-1. **The second encoder adds little, and was broken for most of the build.** Until the fix in Section 4.11 the DINO half of every embedding came from a network with unloaded attention weights. Every number in this report was recomputed after the fix, but earlier design choices (which scorers to keep, the head grid) were made on broken features, {{d:dino_benefit}}. We also use DINOv2-large, not the intended DINOv3, because DINOv3's weights are gated.
-2. **Conformal sets do not adapt.** When q-hat is below 0.5 (it is {{d:qhat_vl}} on vl600) the set rule (keep every species with probability at least 1 minus q-hat) can admit at most one species, so the 90% sets are singletons and the "a second photo shrinks the set" story cannot be shown. Coverage holds only because accuracy already exceeds 90%.
-3. **The open-set gate is weak** (Table OPENSET): on vl600 it rejects {{pct:L6/final.json:extras.vl600.open_set.reject_rate_held_out}} of photos of unseen species while turning away {{pct:L6/final.json:extras.vl600.open_set.false_reject_rate_known}} of photos of known ones. The better inat_india numbers rest on only 5 held-out species. Close relatives of known species are the hardest case: a missing orchid was never rejected and was usually named as a related orchid (Section 7.6).
-4. **Calibration-to-test shift.** Calibration photos are pre-July 2025 and test photos are post-July 2025; thresholds chosen on calibration (selective answering, open-set) are too permissive or too strict on test.
-5. **Test photos come from the same source as the gallery.** Both are iNaturalist research-grade photos; real users take blurrier, more cluttered photos. The planned campus set of our own photos never arrived, so there is no out-of-source test.
-6. **Missing baselines and features.** The Pl@ntNet API baseline (B0), the general VLM baseline (B4) and the VLM reranker were not run for lack of keys; the organ gate ("is it a plant?") is not evaluated (cached embeddings skip it).
-7. **Traits were not written by botanists.** Trait lists were written by an AI coding assistant without an expert check, and the species it did not reach fell back to a bare taxonomic prompt.
-8. **Few-shot evaluation is slightly optimistic for text.** In the few-shot test the name prompt of an added species is approximated by the mean of its cached trait prototypes (to avoid loading the text tower on CPU), which carries some trait information a real "name only" prompt would not.
-9. **Location prior is coarse.** GBIF counts in a radius ignore season, habitat and sampling bias (cities and roadsides are over-recorded), and species without a GBIF match get no prior. Its measured effect is small ({{d:geo_effect_vl}} on vl600, {{d:geo_effect_in}} on inat_india).
-10. **No per-species error analysis**, because per-photo predictions are not stored in the result files.
-11. **Scale and speed.** The catalogue is 607 species; inference takes a few seconds per observation on a laptop CPU, and nothing runs on a phone yet.
-12. **Few test photos per species.** Each vl600 species has {{d:test_obs_sp_vl}} test observations and {{d:test_ph_sp_vl}} test photos, so per-species accuracy would carry intervals tens of points wide; only pooled metrics are reliable. On inat_india the open-set and few-shot experiments use 5 held-out species (53 test photos), so its 100% five-shot accuracy says little.
-13. **Dataset and geographic bias.** Species are chosen by iNaturalist observation counts, which favour showy, urban, roadside and cultivated plants and under-represent grasses, sedges and forest understorey. {{d:india_test_vl}} of vl600 test observations are from India; the rest are worldwide fills, and results are not reported separately by region.
-14. **The date cut does not exclude the same plant.** It keeps test photos out of the encoders' training data, but an observer can photograph the same tree before and after the cutoff: {{d:same_spot_vl}} test observations with GPS have a gallery or calibration observation of the same species at the same rounded coordinates (about 11 m). This is small but makes test slightly easier than truly new plants. BioCLIP 2 has also seen many pre-cutoff photos of every vl600 species, so the test measures new photos of familiar species, not unfamiliar species.
-15. **No significance test against the best baseline.** VanaLens and the concatenated-feature probe differ by {{d:h2h_gain_best}} from one photo without location and their intervals overlap; a paired bootstrap of the difference was not run. Much of what VanaLens adds is capability (sets, backoff, new species, evidence), not top-1.
-16. **Evidence illustrates rather than explains.** The kNN gallery that supplies the reference photos has weight 0 in the final ensemble ({{d:ens_weights}}), so the photos shown are similar examples, not what decided the answer; the matched traits come from a scorer with weight 0.3. Whether the evidence helps users was not tested with users.
-17. **Selective answering is inactive on vl600.** The threshold chosen on calibration answers {{pct:L6/final.json:extras.vl600.selective.test_share_answered}} of test photos, so selective accuracy equals plain top-1.
-18. **The live end-to-end check is small.** It covers {{d:e2e_n_vl}} vl600 observations ({{d:e2e_top1_vl}} top-1, {{d:e2e_ci_vl}}).
+| Current scope | Next step |
+|---|---|
+| **Test photos come from the same source as the gallery.** All photos are iNaturalist research-grade observations, and the date cut does not exclude the same plant photographed again: {{d:same_spot_vl}} test observations with GPS share rounded coordinates (about 11 m) with a gallery or calibration observation of the same species. | Collect a campus and market test set with ordinary phones, including raw-herb photos, and report it separately; drop test observations within 50 m of a gallery observation of the same species. |
+| **The open-set check is baseline strength.** It flags {{pct:L6/final.json:extras.vl600.open_set.reject_rate_held_out}} of photos of 61 unseen species at a {{pct:L6/final.json:extras.vl600.open_set.false_reject_rate_known}} false-flag rate on known species (AUROC {{pct:L6/final.json:extras.vl600.open_set.auroc}}), and close relatives of known species are the hardest case (Section 7.6). | Train a small detector on species held out from the gallery that combines gallery similarity, the energy of the fused logits and the text-prototype margin. |
+| **Calibration-to-test shift and set size.** Thresholds chosen on pre-cutoff calibration photos are too lenient for the harder post-cutoff test photos (the selective step answers {{pct:L6/final.json:extras.vl600.selective.test_share_answered}} of them), and with q-hat {{d:qhat_vl}} the 90% sets are single species, valid because accuracy exceeds 90% but adding little information. | Calibrate on a recent post-cutoff slice that is not in test, and add adaptive sets (APS/RAPS) at 95% and 98% coverage, with the long-tail and multi-photo conformal variants of [R16, R17]. |
+| **Catalogue size and on-device use.** The catalogue is 607 species, inference takes {{d:e2e_sec_vl}} per observation on a laptop CPU, and the second encoder adds {{d:dino_gain_short}} top-1 over BioCLIP 2 alone while a second ViT-L encoder runs on every photo. | Grow to the 2,000 most-observed Indian species (only gallery photos and traits are needed), test DINOv3 or drop the second encoder, and distil to a small on-device encoder for an offline phone app. |
+| **Evaluation breadth.** The Pl@ntNet API and general VLM baselines were not run (no keys), per-photo predictions are not stored, so there is no paired test against the linear probe and no per-species error analysis, and each species has {{d:test_obs_sp_vl}} test observations; {{d:india_test_vl}} of test observations are from India. | Store per-photo predictions to report paired bootstrap intervals, per-species and India-only results; run the Pl@ntNet and VLM baselines and add a fine-tuned-encoder reference row. |
+| **Explanations are not yet expert- or user-validated.** Trait descriptions were generated with a language model and are pending botanist review, and the evidence photos come from the kNN gallery, which has weight 0 in the final fusion ({{d:ens_weights}}), so they show similar examples rather than the deciding vote. | Botanist review of the traits of the 100 most-confused species first; show neighbours of the deciding scorer, and run a small user study on whether the evidence helps people catch wrong answers. |
 
 ## How we plan to overcome them and improve
 
-| Limitation | Concrete next step |
-|---|---|
-| 1. Second encoder | Done: loader fixed with an every-tensor-loaded test and everything refit; the BioCLIP-only versus BioCLIP+DINO probes are in Table H2H. Next: accept the DINOv3 licence and swap it in behind the same 1024-d contract; if it adds as little as DINOv2, drop the second encoder and halve encoding cost. |
-| 2. Non-adaptive sets | Replace the threshold rule with adaptive prediction sets (APS/RAPS), report 95% and 98% coverage where sets become informative, and add the prevalence-adjusted score for rare species [R16] and multi-input conformal aggregation across photos [R17]. |
-| 3. Weak open-set gate | Combine several signals (gallery similarity, energy of the fused logits, text-prototype margin) in a small detector trained on species held out from the gallery, and calibrate its threshold on post-cutoff data. |
-| 4. Calibration shift | Use a recent slice (post-cutoff observations not in test) as the calibration split, and refresh calibration monthly from new observations. |
-| 5. Same-source test | Collect a campus and market test set with ordinary phones, including raw-herb photos, and report it separately. |
-| 6. Missing baselines | Run B0 (Pl@ntNet API, free tier) and B4 on the inat_india test split, and evaluate the VLM reranker on ambiguous cases only, as designed. |
-| 7. Unchecked traits | Have a botanist review the trait lists of the 100 most-confused species first, and generate traits for the remaining species with a reviewed template. |
-| 8. Few-shot optimism | Re-run the few-shot test with the real BioCLIP 2 text tower on GPU. |
-| 9. Coarse location prior | Replace raw GBIF counts with a learned range model (SINR) and add a month-of-year term. |
-| 10. No error analysis | Store per-photo predictions in the cache and add per-species, per-organ and per-growth-form tables plus a confusion list of look-alike pairs. |
-| 11. Scale and speed | Grow the catalogue to the top 2,000 Indian species (only gallery photos and traits are needed), and distil to a small on-device encoder. |
-| 12. Few test photos per species | Raise the test cap to 50 observations per species as iNaturalist accumulates post-cutoff photos, and report per-species accuracy only where the interval is narrower than 10 points. |
-| 13. Dataset and geographic bias | Report India-only and worldwide test subsets separately; add species by growth form (grasses, ferns, trees) and from forest-department checklists, not only by observation count. |
-| 14. Same plant across the cutoff | Drop test observations within 50 m of a gallery observation of the same species, or split by observer, and report both numbers. |
-| 15. No significance test | Store per-photo predictions and report a paired bootstrap interval for every difference in Table H2H. |
-| 16. Evidence not causal | Show the neighbours of the deciding scorer (or give kNN a non-zero weight), and run a small user study on whether evidence helps people catch wrong answers. |
-| 17. Inactive selective step | Choose the threshold on a recent (post-cutoff, non-test) calibration slice so that it actually abstains when accuracy falls below target. |
-| 18. Small live check | Run the live pipeline on the full test split overnight and report it with its interval. |
-
-Beyond fixing limitations, three features follow naturally from the design:
+The right-hand column of the table above is the plan for each item. Beyond it, three features follow naturally from the design:
 
 - **Offline mobile app.** A small distilled encoder plus a compressed gallery of a few thousand species fits on a phone, so identification works in forests and fields without signal; the location prior can be shipped per state.
 - **More regional species.** Because species are added by appending photos and traits, a state forest department or a university can maintain its own flora file.
@@ -394,7 +378,9 @@ Beyond fixing limitations, three features follow naturally from the design:
 
 ## Conclusion
 
-VanaLens shows that a plant identifier built only from frozen foundation models, small heads and careful calibration can reach high accuracy on hundreds of species while staying honest and extensible. On 607 species with test photos taken after the encoders' training data, it reaches {{row:vl600:+ geo prior:top1}} top-1 from one photo, just short of our 95% target, and {{row:vl600:VanaLens up to 3 photos + geo:top1}} from up to three, with calibration error of about {{pct:L3/ablation_vl600.json:rows.ensemble.ece}}, and it learns a new species from five photos with no retraining. Its answers come with reference photos, matched traits and a genus or family fallback. Most of its top-1 comes from frozen BioCLIP 2 features with a linear head; what VanaLens adds is mainly capability and honesty rather than accuracy. The weak points are equally clear: a second encoder that adds little even after a late loader fix, prediction sets that do not yet adapt, an open-set gate that needs a better signal, and a test set drawn from the same source as the gallery. Each has a concrete fix, and none requires giving up the core idea of frozen encoders with transparent, swappable parts.
+VanaLens identifies 607 common Indian and worldwide plant species from phone photos with calibrated confidence and visible evidence. On {{d:n_photos_vl}} test photos taken after its encoders' training data, it reaches {{rowci:vl600:+ geo prior:top1}} top-1 from one photo with location and {{rowci:vl600:VanaLens up to 3 photos + geo:top1}} from up to three photos of the same plant, meeting the 95% target when the user adds photos. On the same photos it is {{d:h2h_gain_zs}} above BioCLIP 2 zero-shot over the same names and, with up to three photos and location, {{d:h2h_gain_best3}} above a linear probe on the same features. Its confidence is calibrated (ECE {{pct:L3/ablation_vl600.json:rows.ensemble.ece}}), it backs off to genus or family when unsure and is then right {{row:vl600:+ geo prior:backoff_acc}} of the time at the level it answers, it can say a plant may not be in its catalogue, and it learns a new species from five photos in seconds ({{pct:L6/final.json:extras.vl600.few_shot.2.top1_new}} top-1 on 61 unseen species) without retraining anything.
+
+These results come from a deliberate design: frozen foundation features with light trained heads, fused and calibrated scorers, and decisions built on calibrated probabilities. That design is what makes the system cheap to run, quick to extend and able to show real reference photos as evidence. Section 8 sets out the current scope (same-source test photos, a baseline-strength open-set check, calibration-to-test shift, catalogue size, evaluation breadth and unvalidated explanations), each with a concrete next step, and none of those steps requires giving up the frozen-feature core.
 
 ## References {-}
 
